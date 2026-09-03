@@ -40,4 +40,5 @@ docs/prompts
 docs/requirements
 docs/roadmap-pos-fase-15.md
 disk-seed
-.cursor
+# Cursor IDE (local). Tracked files stay tracked until `git rm -r --cached .cursor`.
+/.cursor/
