@@ -6,7 +6,7 @@ Coeleo OS. The normative spec is [`docs/requirements/coeleo-os-specification-v02
 
 Kernel code: `kernel/`. Userspace: `userspace/libs/` (shared crates) and `userspace/apps/` (ELFs).
 
-Build and run: `make all`, `make run` (detail in the README).
+Build and run: `make all`, `make run` (detail in [`docs/contrib/develop.md`](docs/contrib/develop.md)). Product map: [`README.md`](README.md).
 
 This file does not replace the spec. System behaviour and phase scope live there. Here is *how* to write and work; there is *what* to build.
 

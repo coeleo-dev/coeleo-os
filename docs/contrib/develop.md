@@ -1,6 +1,6 @@
 # Development guide
 
-Environment setup, how to build, and where to put new code. Commands and phase acceptance: table in [`README.md`](../../README.md). Code practices: [`AGENTS.md`](../../AGENTS.md).
+Environment setup, how to build, and where to put new code. Product map: [`README.md`](../../README.md). Code practices: [`AGENTS.md`](../../AGENTS.md).
 
 ## Environment
 
@@ -99,7 +99,7 @@ Do not invent an ABI “for the day you need it”.
 
 ## Tests
 
-Full list of `make test-phase*` and `make test-plasma-p*` in the [README](../../README.md). After an organisation slice (folders, splits):
+Phase and Plasma gates are `make test-phase*` / `make test-plasma-p*` in the root [`GNUmakefile`](../../GNUmakefile). After an organisation slice (folders, splits):
 
 ```
 make userspace
