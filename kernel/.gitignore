@@ -1,0 +1,9 @@
+# Copied ELF (`make -C kernel` → `cp …/kernel kernel`).
+/kernel
+
+# Cargo (`x86_64-unknown-none` + host build-scripts for cc / font atlas).
+/target
+
+# rustfmt backup; rustc ICE dump if a nightly panics here.
+*.rs.bk
+rustc-ice-*.txt

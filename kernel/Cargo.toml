@@ -1,0 +1,37 @@
+[package]
+name = "kernel"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+coeleo-theme = { path = "../userspace/libs/coeleo-theme" }
+coeleo-draw = { path = "../userspace/libs/coeleo-draw" }
+coeleo-image = { path = "../userspace/libs/coeleo-image" }
+elf = { version = "0.8", default-features = false }
+fatfs = { git = "https://github.com/rafalh/rust-fatfs", rev = "2aefc2a027ce94ed0671752814dac203f0450e11", default-features = false, features = ["alloc", "lfn", "log_level_error"] }
+limine = "0.5"
+pc-keyboard = "0.7"
+pic8259 = "0.11"
+smoltcp = { version = "0.12", default-features = false, features = [
+    "alloc",
+    "medium-ethernet",
+    "proto-ipv4",
+    "socket-icmp",
+    "socket-tcp",
+    "socket-tcp-reno",
+] }
+spin = "0.10"
+talc = "4"
+uart_16550 = "0.3"
+virtio-drivers = "0.13"
+x86_64 = "0.15"
+
+[build-dependencies]
+cc = "1"
+
+[profile.dev]
+opt-level = 2
+panic = "abort"
+
+[profile.release]
+panic = "abort"

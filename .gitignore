@@ -1,0 +1,41 @@
+# Firmware / bootloader fetched by the makefile (`make distclean` removes them).
+/limine
+/edk2-ovmf
+/ovmf
+
+# ISO tree, CD, HDD, FAT disks (`disk.img`, `disk-ahci.img`), USB stick image.
+/iso_root/
+*.iso
+*.hdd
+*.img
+
+# Cargo output in kernel/, userspace/, tools/.
+target/
+
+# ELF copies next to each crate (`userspace/GNUmakefile`).
+/userspace/apps/hello/hello
+/userspace/apps/fault/fault
+/userspace/apps/sh/sh
+/userspace/apps/ls/ls
+/userspace/apps/cat/cat
+/userspace/apps/clock/clock
+/userspace/apps/spin/spin
+/userspace/apps/winprobe/winprobe
+/userspace/apps/widgets/widgets
+/userspace/apps/install/install
+
+# Packer output (`make userspace`).
+/userspace/libs/pkg/*.coe
+
+# Test / editor leftovers.
+__pycache__/
+*.py[cod]
+*.rs.bk
+.env
+
+docs/fonts
+docs/image
+docs/old
+docs/prompts
+docs/requirements
+docs/roadmap-pos-fase-15.md

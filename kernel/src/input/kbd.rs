@@ -1,0 +1,201 @@
+//! Shared PS/2 decode. TCB-adjacent: no port I/O, only the crate state.
+
+use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+
+use pc_keyboard::{DecodedKey, HandleControl, KeyCode, KeyState, Keyboard, ScancodeSet1, layouts};
+use spin::Mutex;
+
+static KBD: Mutex<Keyboard<layouts::Us104Key, ScancodeSet1>> = Mutex::new(Keyboard::new(
+    ScancodeSet1::new(),
+    layouts::Us104Key,
+    HandleControl::MapLettersToUnicode,
+));
+
+const QUEUE_CAP: usize = 64;
+static mut BYTES: [u8; QUEUE_CAP] = [0; QUEUE_CAP];
+static HEAD: AtomicUsize = AtomicUsize::new(0);
+static TAIL: AtomicUsize = AtomicUsize::new(0);
+static LALT: AtomicBool = AtomicBool::new(false);
+static RALT: AtomicBool = AtomicBool::new(false);
+
+pub enum Key {
+    Tab,
+    Esc,
+    Up,
+    Down,
+    Left,
+    Right,
+    Enter,
+    Backspace,
+    Char(u8),
+    AltSpace,
+}
+
+/// Compositor / `coeleo>` policy shared by PS/2 and HID boot keyboard.
+pub fn dispatch(key: Key) {
+    match key {
+        Key::AltSpace => crate::comp::irq_krunner(),
+        Key::Tab => crate::comp::irq_tab(),
+        Key::Esc => {
+            let _ = crate::comp::irq_esc();
+        }
+        Key::Up => {
+            let _ = crate::comp::irq_files_key(crate::comp::FilesKey::Up);
+        }
+        Key::Down => {
+            let _ = crate::comp::irq_files_key(crate::comp::FilesKey::Down);
+        }
+        Key::Left => {
+            let _ = crate::comp::irq_files_key(crate::comp::FilesKey::Left);
+        }
+        Key::Right => {
+            let _ = crate::comp::irq_files_key(crate::comp::FilesKey::Right);
+        }
+        Key::Enter => {
+            if crate::comp::irq_files_key(crate::comp::FilesKey::Enter) {
+                return;
+            }
+            enqueue_or_kill(b'\n');
+        }
+        Key::Backspace => {
+            if crate::comp::irq_files_key(crate::comp::FilesKey::Backspace) {
+                return;
+            }
+            enqueue_or_kill(0x08);
+        }
+        Key::Char(b) => {
+            if b == b'\n' || b == b'\r' {
+                dispatch(Key::Enter);
+                return;
+            }
+            if b == 0x08 {
+                dispatch(Key::Backspace);
+                return;
+            }
+            if b == 0x1B {
+                dispatch(Key::Esc);
+                return;
+            }
+            if crate::comp::irq_runner_char(b) {
+                return;
+            }
+            if crate::comp::irq_client_char(b) {
+                return;
+            }
+            if crate::comp::irq_files_char(b) {
+                return;
+            }
+            if crate::comp::files_focused() && b != 3 {
+                return;
+            }
+            enqueue_or_kill(b);
+        }
+    }
+}
+
+/// One ASCII byte, or `None` if the scancode is not yet a character.
+pub fn push(scancode: u8) -> Option<u8> {
+    let event = {
+        let mut kbd = KBD.lock();
+        match kbd.add_byte(scancode) {
+            Ok(Some(ev)) => kbd.process_keyevent(ev),
+            _ => None,
+        }
+    };
+    match event {
+        Some(DecodedKey::Unicode(c)) if c.is_ascii() => Some(c as u8),
+        Some(DecodedKey::RawKey(KeyCode::Backspace | KeyCode::Delete)) => Some(0x08),
+        Some(DecodedKey::RawKey(KeyCode::Return | KeyCode::NumpadEnter)) => Some(b'\n'),
+        _ => None,
+    }
+}
+
+/// Drain the scancode queue into decoded bytes. Ctrl+C (0x03) kills the
+/// foreground child and is not enqueued. Tab always switches compositor
+/// focus; arrows/Enter/Backspace go to the file panel when it is focused.
+pub fn drain_ps2() {
+    while let Some(sc) = crate::ps2::pop() {
+        let (event, krunner) = {
+            let mut kbd = KBD.lock();
+            match kbd.add_byte(sc) {
+                Ok(Some(ev)) => {
+                    note_alt(ev.code, ev.state);
+                    if ev.code == KeyCode::Spacebar && ev.state == KeyState::Down && alt_down() {
+                        (None, true)
+                    } else {
+                        (kbd.process_keyevent(ev), false)
+                    }
+                }
+                _ => (None, false),
+            }
+        };
+        if krunner {
+            dispatch(Key::AltSpace);
+            continue;
+        }
+        match event {
+            Some(DecodedKey::Unicode('\t')) => dispatch(Key::Tab),
+            Some(DecodedKey::RawKey(KeyCode::Escape)) => dispatch(Key::Esc),
+            Some(DecodedKey::RawKey(KeyCode::ArrowUp)) => dispatch(Key::Up),
+            Some(DecodedKey::RawKey(KeyCode::ArrowDown)) => dispatch(Key::Down),
+            Some(DecodedKey::RawKey(KeyCode::ArrowLeft)) => dispatch(Key::Left),
+            Some(DecodedKey::RawKey(KeyCode::ArrowRight)) => dispatch(Key::Right),
+            Some(DecodedKey::RawKey(KeyCode::Return | KeyCode::NumpadEnter)) => {
+                dispatch(Key::Enter);
+            }
+            Some(DecodedKey::RawKey(KeyCode::Backspace | KeyCode::Delete)) => {
+                dispatch(Key::Backspace);
+            }
+            Some(DecodedKey::Unicode(c)) if c.is_ascii() => dispatch(Key::Char(c as u8)),
+            _ => {}
+        }
+    }
+}
+
+fn note_alt(code: KeyCode, state: KeyState) {
+    let down = state == KeyState::Down;
+    match code {
+        KeyCode::LAlt => LALT.store(down, Ordering::Release),
+        KeyCode::RAltGr => RALT.store(down, Ordering::Release),
+        _ => {}
+    }
+}
+
+fn alt_down() -> bool {
+    LALT.load(Ordering::Acquire) || RALT.load(Ordering::Acquire)
+}
+
+fn enqueue_or_kill(b: u8) {
+    if b == 3 && crate::sched::kill_foreground() {
+        return;
+    }
+    enqueue(b);
+    crate::sched::wake_stdin();
+}
+
+pub fn pop_byte() -> Option<u8> {
+    let tail = TAIL.load(Ordering::Relaxed);
+    let head = HEAD.load(Ordering::Acquire);
+    if tail == head {
+        return None;
+    }
+    let byte = unsafe { BYTES[tail] };
+    TAIL.store((tail + 1) % QUEUE_CAP, Ordering::Release);
+    Some(byte)
+}
+
+pub fn bytes_empty() -> bool {
+    HEAD.load(Ordering::Acquire) == TAIL.load(Ordering::Acquire)
+}
+
+fn enqueue(byte: u8) {
+    let head = HEAD.load(Ordering::Relaxed);
+    let next = (head + 1) % QUEUE_CAP;
+    if next == TAIL.load(Ordering::Acquire) {
+        return;
+    }
+    unsafe {
+        BYTES[head] = byte;
+    }
+    HEAD.store(next, Ordering::Release);
+}

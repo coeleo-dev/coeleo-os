@@ -1,0 +1,26 @@
+[workspace]
+members = [
+    "libs/libcoeleo",
+    "libs/coeleo-theme",
+    "libs/coeleo-draw",
+    "libs/libcoeleoui",
+    "libs/pkg",
+    "apps/hello",
+    "apps/fault",
+    "apps/sh",
+    "apps/ls",
+    "apps/cat",
+    "apps/clock",
+    "apps/spin",
+    "apps/winprobe",
+    "apps/widgets",
+    "apps/install",
+]
+resolver = "3"
+
+[profile.dev]
+panic = "abort"
+debug = false
+
+[profile.release]
+panic = "abort"

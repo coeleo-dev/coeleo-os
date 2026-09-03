@@ -1,0 +1,9 @@
+[package]
+name = "install"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+libcoeleo = { path = "../../libs/libcoeleo" }
+libcoeleoui = { path = "../../libs/libcoeleoui" }
+coeleo-theme = { path = "../../libs/coeleo-theme" }

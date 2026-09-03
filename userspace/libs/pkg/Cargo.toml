@@ -1,0 +1,8 @@
+[package]
+name = "pkg"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+ed25519-dalek = { version = "2.2", default-features = false, features = ["zeroize"] }
+sha2 = { version = "0.10", default-features = false, features = ["force-soft"] }

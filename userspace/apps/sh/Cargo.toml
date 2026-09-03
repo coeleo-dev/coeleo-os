@@ -1,0 +1,8 @@
+[package]
+name = "sh"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+libcoeleo = { path = "../../libs/libcoeleo" }
+pkg = { path = "../../libs/pkg" }

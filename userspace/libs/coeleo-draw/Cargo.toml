@@ -1,0 +1,10 @@
+[package]
+name = "coeleo-draw"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+coeleo-theme = { path = "../coeleo-theme" }
+
+[build-dependencies]
+fontdue = "0.9"

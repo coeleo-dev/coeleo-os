@@ -1,0 +1,8 @@
+[package]
+name = "winprobe"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+libcoeleo = { path = "../../libs/libcoeleo" }
+coeleo-theme = { path = "../../libs/coeleo-theme" }

@@ -1,0 +1,8 @@
+[package]
+name = "widgets"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+libcoeleoui = { path = "../../libs/libcoeleoui" }
+libcoeleo = { path = "../../libs/libcoeleo" }

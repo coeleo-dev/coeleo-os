@@ -1,0 +1,9 @@
+[package]
+name = "libcoeleoui"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+libcoeleo = { path = "../libcoeleo" }
+coeleo-theme = { path = "../coeleo-theme" }
+coeleo-draw = { path = "../coeleo-draw" }
