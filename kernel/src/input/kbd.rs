@@ -27,6 +27,8 @@ pub enum Key {
     Down,
     Left,
     Right,
+    Home,
+    End,
     Enter,
     Backspace,
     Delete,
@@ -66,6 +68,8 @@ pub fn dispatch(key: Key) {
                 enqueue_csi(b'C');
             }
         }
+        Key::Home => enqueue_csi(b'H'),
+        Key::End => enqueue_csi(b'F'),
         Key::Enter => {
             if crate::comp::irq_files_key(crate::comp::FilesKey::Enter) {
                 return;
@@ -73,7 +77,9 @@ pub fn dispatch(key: Key) {
             enqueue_or_kill(b'\n');
         }
         Key::Delete => {
-            let _ = crate::comp::irq_files_key(crate::comp::FilesKey::Delete);
+            if !crate::comp::irq_files_key(crate::comp::FilesKey::Delete) {
+                enqueue_seq(b"\x1b[3~");
+            }
         }
         Key::Backspace => {
             if crate::comp::irq_files_key(crate::comp::FilesKey::Backspace) {
@@ -163,6 +169,8 @@ pub fn drain_ps2() {
             Some(DecodedKey::RawKey(KeyCode::ArrowDown)) => dispatch(Key::Down),
             Some(DecodedKey::RawKey(KeyCode::ArrowLeft)) => dispatch(Key::Left),
             Some(DecodedKey::RawKey(KeyCode::ArrowRight)) => dispatch(Key::Right),
+            Some(DecodedKey::RawKey(KeyCode::Home)) => dispatch(Key::Home),
+            Some(DecodedKey::RawKey(KeyCode::End)) => dispatch(Key::End),
             Some(DecodedKey::RawKey(KeyCode::Return | KeyCode::NumpadEnter)) => {
                 dispatch(Key::Enter);
             }
@@ -217,12 +225,28 @@ fn enqueue_csi(final_byte: u8) {
     enqueue_or_kill(final_byte);
 }
 
+fn enqueue_seq(s: &[u8]) {
+    for &b in s {
+        enqueue_or_kill(b);
+    }
+}
+
 fn enqueue_or_kill(b: u8) {
     if b == 3 && crate::sched::kill_foreground() {
         return;
     }
     enqueue(b);
     crate::sched::wake_stdin();
+}
+
+pub fn enqueue_byte(b: u8) {
+    enqueue_or_kill(b);
+}
+
+pub fn enqueue_str(s: &str) {
+    for &b in s.as_bytes() {
+        enqueue_or_kill(b);
+    }
 }
 
 pub fn pop_byte() -> Option<u8> {

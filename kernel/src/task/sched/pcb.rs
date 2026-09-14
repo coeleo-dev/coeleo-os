@@ -6,12 +6,12 @@ use x86_64::structures::paging::{PhysFrame, Size4KiB};
 use crate::elfload::Image;
 use crate::fd::FdTable;
 
-pub const MAX_PROC: usize = 4;
+pub const MAX_PROC: usize = 8;
 pub(super) const KSTACK_SIZE: usize = 16 * 1024;
 pub(super) const ERR: u64 = u64::MAX;
 pub(super) const PS_REC: usize = 16;
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum State {
     Runnable,
     Running,

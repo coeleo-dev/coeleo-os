@@ -128,11 +128,13 @@ pub(super) fn insert_pcb(
     stdout_fd: u64,
 ) -> Option<usize> {
     let mut s = SCHED.lock();
-    let Some(slot) = s.procs.iter().position(|p| p.is_none()) else {
+    let free_slot = s.procs.iter().position(|p| p.is_none());
+    if free_slot.is_none() {
         drop(s);
         elfload::unload(image);
         return None;
-    };
+    }
+    let slot = free_slot.unwrap();
     let fds = if parent == 0 {
         FdTable::new_stdio()
     } else {
@@ -375,7 +377,8 @@ fn spawn_with(
         }
     };
     let slot = insert_pcb(image, path, parent, argv, stdin_fd, stdout_fd)?;
-    Some(SCHED.lock().procs[slot].as_ref().unwrap().pid)
+    let pid = SCHED.lock().procs[slot].as_ref().unwrap().pid;
+    Some(pid)
 }
 
 fn argv_setup(image: &Image, path: &str, blob: &[u8]) -> Option<elfload::ArgvSetup> {

@@ -3,7 +3,7 @@
 use crate::elfload::Image;
 use crate::sched;
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Outcome {
     Exited,
     Fault,

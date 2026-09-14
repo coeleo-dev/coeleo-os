@@ -8,8 +8,8 @@ use crate::panel;
 use crate::serial;
 use coeleo_draw::{self, Clip, Target};
 use coeleo_theme::{
-    ACCENT, BG, DANGER, DECO_BTN_PAD, DECO_H, DIM, GAP, PAD, RADIUS, SHADOW, SHADOW_A, SHADOW_PX,
-    SURFACE, TEXT,
+    ACCENT, BG, BORDER, BORDER_LIGHT, DANGER, DECO_BTN_PAD, DECO_H, DIM, GAP, HOVER, PAD, RADIUS,
+    SHADOW, SHADOW_A, SHADOW_PX, SURFACE, SURFACE_RAISED, TEXT,
 };
 
 use super::damage::note;
@@ -18,7 +18,7 @@ use super::files::FilesSink;
 use super::geom::{
     LAUNCH_PAD, LAUNCH_ROW, LAUNCH_SEP, POWER_FOOTER, any_maximized, app_icon, app_label,
     confirm_btns, confirm_popup, confirm_shadow, desk_menu_popup, desk_menu_shadow,
-    files_menu_popup, files_menu_shadow, frame_title, h_work, krunner_popup, launcher_popup,
+    files_menu_popup, files_menu_shadow, frame_icon, frame_title, h_work, krunner_popup, launcher_popup,
     launcher_shadow, opaque_rect, shadow_bounds, shadow_rect, strut_rect, task_infos, visible_top,
     work_rect,
 };
@@ -344,7 +344,7 @@ pub(super) fn paint_confirm_clip(st: &mut State, clip: Rect) {
     };
     let pw = op.x1.saturating_sub(op.x0);
     let ph = op.y1.saturating_sub(op.y0);
-    coeleo_draw::fill_round(t, op.x0, op.y0, pw, ph, RADIUS, SURFACE, dclip);
+    coeleo_draw::fill_stroke_round(t, op.x0, op.y0, pw, ph, RADIUS, SURFACE_RAISED, BORDER_LIGHT, dclip);
     let title = match st.power_dlg {
         Some(PowerKind::Reboot) => "Restart the computer?",
         Some(PowerKind::PowerOff) => "Turn off the computer?",
@@ -377,7 +377,7 @@ pub(super) fn paint_confirm_clip(st: &mut State, clip: Rect) {
                 coeleo_draw::hover_fill(t, r.x0, r.y0, bw, bh, dclip);
             }
         } else {
-            coeleo_draw::fill_round(
+            coeleo_draw::fill_stroke_round(
                 t,
                 r.x0,
                 r.y0,
@@ -385,6 +385,7 @@ pub(super) fn paint_confirm_clip(st: &mut State, clip: Rect) {
                 bh,
                 coeleo_theme::RADIUS_SM,
                 SURFACE,
+                BORDER,
                 dclip,
             );
         }
@@ -556,6 +557,8 @@ pub(super) fn present_damage_protect(
         if skip_opaque != Some(i) {
             paint_client_clip(st, i, &clients, clip, protect);
         }
+        let focused = visible_top(st) == Some(i);
+        paint_frame_outline(st, i, clip, protect, focused);
     }
     if st.launcher_open {
         paint_launcher_clip(st, clip);
@@ -572,10 +575,49 @@ pub(super) fn present_damage_protect(
     if st.files_menu_open {
         paint_files_menu_clip(st, clip);
     }
+    if !st.toast.is_empty() {
+        paint_toast_clip(st, clip);
+    }
     if log_sh {
         log_shadow();
     }
     note(st, clip);
+}
+
+pub(super) fn paint_toast_clip(st: &mut State, clip: Rect) {
+    let msg = &st.toast;
+    let tw = coeleo_draw::text_width(msg);
+    let pw = tw.saturating_add(32);
+    let ph = 32u32;
+    let px = st.fb.w.saturating_sub(pw) / 2;
+    let py = panel::work_h(st.fb.h).saturating_sub(40);
+    let r = Rect { x0: px, y0: py, x1: px + pw, y1: py + ph };
+    if !rect_intersects(r, clip) {
+        return;
+    }
+    let vis = rect_intersect(r, clip);
+    let t = tgt(st.scene_fb);
+    let dclip = Clip { x0: vis.x0, y0: vis.y0, x1: vis.x1, y1: vis.y1 };
+    coeleo_draw::fill_stroke_round(
+        t,
+        px,
+        py,
+        pw,
+        ph,
+        RADIUS,
+        SURFACE_RAISED,
+        BORDER_LIGHT,
+        dclip,
+    );
+    coeleo_draw::text(
+        t,
+        px + 16,
+        py + (ph - coeleo_draw::FONT_H) / 2,
+        msg,
+        TEXT,
+        vis.x1,
+        dclip,
+    );
 }
 
 pub(super) fn need_client_snap(st: &State, clip: Rect, skip_opaque: Option<usize>) -> bool {
@@ -752,44 +794,34 @@ pub(super) fn paint_vt_except(st: &mut State, clip: Rect, holes: &[Rect]) {
     });
 }
 
-pub(super) fn paint_focus_strip(
+pub(super) fn paint_frame_outline(
     st: &mut State,
-    ox: u32,
-    oy: u32,
-    cw: u32,
-    fh: u32,
-    vis: Rect,
+    i: usize,
+    clip: Rect,
     protect: Rect,
+    focused: bool,
 ) {
-    const BAR: u32 = 3;
-    let t = tgt(st.scene_fb);
-    let y1 = oy.saturating_add(BAR + 1).min(vis.y1);
-    for y in vis.y0..y1 {
-        for x in vis.x0..vis.x1 {
-            if rect_contains(protect, x, y) {
-                continue;
-            }
-            let cov = coeleo_draw::coverage_round(x, y, ox, oy, cw, fh, RADIUS);
-            if cov == 0 {
-                continue;
-            }
-            let fade = match y.saturating_sub(oy) {
-                0 => 200u8,
-                1 => 140,
-                2 => 70,
-                _ => 0,
-            };
-            if fade == 0 {
-                continue;
-            }
-            let a = ((u32::from(cov) * u32::from(fade)) / 255) as u8;
-            if a == 0 {
-                continue;
-            }
-            let dst = coeleo_draw::get(t, x, y);
-            coeleo_draw::put(t, x, y, coeleo_draw::blend(dst, ACCENT, a));
-        }
+    let f = st.frames[i];
+    if f.maximized {
+        return;
     }
+    let fh = DECO_H.saturating_add(f.ch);
+    let frame_rect = Rect {
+        x0: f.ox,
+        y0: f.oy,
+        x1: f.ox.saturating_add(f.cw),
+        y1: f.oy.saturating_add(fh),
+    };
+    let vis = rect_intersect(frame_rect, clip);
+    if rect_is_empty(vis) {
+        return;
+    }
+    let color = if focused { ACCENT } else { BORDER };
+    let t = tgt(st.scene_fb);
+    let draw = |c: Clip| {
+        coeleo_draw::stroke_round(t, f.ox, f.oy, f.cw, fh, RADIUS, color, c);
+    };
+    deco_clip_draw(vis, protect, draw);
 }
 
 pub(super) fn paint_deco_clip(st: &mut State, i: usize, clip: Rect, protect: Rect) {
@@ -838,19 +870,32 @@ pub(super) fn paint_deco_clip(st: &mut State, i: usize, clip: Rect, protect: Rec
             }
         }
     }
+    let app_ic = frame_icon(f.kind);
+    let icon_x = f.ox.saturating_add(PAD);
+    let icon_y = f.oy.saturating_add((DECO_H.saturating_sub(coeleo_draw::ICON)) / 2);
+    paint_deco_icon(
+        st,
+        app_ic,
+        icon_x,
+        icon_y,
+        if focused { ACCENT } else { DIM },
+        clip,
+        protect,
+    );
+
     let title_owned = match f.kind {
         FrameKind::Files => crate::fm::window_title(),
         _ => alloc::string::String::from(frame_title(f.kind)),
     };
+    let title_x = icon_x.saturating_add(coeleo_draw::ICON + GAP / 2);
     let text_clip = f.ox.saturating_add(f.cw.saturating_sub(BTN * 3));
-    let ty =
-        f.oy.saturating_add(DECO_H.saturating_sub(coeleo_draw::FONT_H) / 2);
+    let ty = f.oy.saturating_add(DECO_H.saturating_sub(coeleo_draw::FONT_H) / 2);
     let title_color = if focused { TEXT } else { DIM };
-    let max_px = text_clip.saturating_sub(f.ox.saturating_add(PAD));
+    let max_px = text_clip.saturating_sub(title_x);
     let title = elide_title_px(&title_owned, max_px);
     deco_text(
         st,
-        f.ox.saturating_add(PAD),
+        title_x,
         ty,
         &title,
         title_color,
@@ -858,6 +903,16 @@ pub(super) fn paint_deco_clip(st: &mut State, i: usize, clip: Rect, protect: Rec
         clip,
         protect,
     );
+
+    let sep_y = f.oy.saturating_add(DECO_H).saturating_sub(1);
+    if sep_y >= vis.y0 && sep_y < vis.y1 {
+        let sx0 = f.ox.max(vis.x0);
+        let sx1 = f.ox.saturating_add(f.cw).min(vis.x1);
+        if sx1 > sx0 {
+            coeleo_draw::fill_span(t, sx0, sep_y, sx1.saturating_sub(sx0), BORDER);
+        }
+    }
+
     let bx = f.ox.saturating_add(f.cw);
     let by = f.oy.saturating_add(DECO_BTN_PAD);
     let mx = st.cx.max(0) as u32;
@@ -867,35 +922,41 @@ pub(super) fn paint_deco_clip(st: &mut State, i: usize, clip: Rect, protect: Rec
         bx.saturating_sub(BTN * 2),
         bx.saturating_sub(BTN),
     ];
+    let mut btn_hover = [false; 3];
     for (n, x0) in buttons.iter().copied().enumerate() {
         if mx >= x0 && mx < x0.saturating_add(BTN) && my >= by && my < by.saturating_add(BTN) {
+            btn_hover[n] = true;
             if n == 2 {
-                coeleo_draw::danger_fill(t, x0, by, BTN, BTN, dclip);
+                coeleo_draw::fill_round(t, x0, by, BTN, BTN, coeleo_theme::RADIUS_SM, DANGER, dclip);
             } else {
-                coeleo_draw::hover_fill(t, x0, by, BTN, BTN, dclip);
+                coeleo_draw::fill_round(t, x0, by, BTN, BTN, coeleo_theme::RADIUS_SM, HOVER, dclip);
             }
         }
     }
     let iy = by + (BTN.saturating_sub(coeleo_draw::ICON)) / 2;
     let ix = |x0: u32| x0 + (BTN.saturating_sub(coeleo_draw::ICON)) / 2;
+    let min_color = if btn_hover[0] { TEXT } else { title_color };
+    let max_color = if btn_hover[1] { TEXT } else { title_color };
+    let close_color = if btn_hover[2] { 0x00FF_FFFF } else { title_color };
+
     paint_deco_icon(
         st,
         coeleo_draw::Icon::Min,
         ix(buttons[0]),
         iy,
-        TEXT,
+        min_color,
         clip,
         protect,
     );
     if f.maximized {
-        paint_deco_restore(st, ix(buttons[1]), iy, TEXT, clip, protect);
+        paint_deco_restore(st, ix(buttons[1]), iy, max_color, clip, protect);
     } else {
         paint_deco_icon(
             st,
             coeleo_draw::Icon::Max,
             ix(buttons[1]),
             iy,
-            TEXT,
+            max_color,
             clip,
             protect,
         );
@@ -905,13 +966,10 @@ pub(super) fn paint_deco_clip(st: &mut State, i: usize, clip: Rect, protect: Rec
         coeleo_draw::Icon::Close,
         ix(buttons[2]),
         iy,
-        TEXT,
+        close_color,
         clip,
         protect,
     );
-    if focused {
-        paint_focus_strip(st, f.ox, f.oy, f.cw, fh, vis, protect);
-    }
 }
 
 fn paint_deco_icon(

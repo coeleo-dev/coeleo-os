@@ -4,7 +4,7 @@ use alloc::string::String;
 
 use crate::fs::DirEnt;
 use coeleo_draw::Icon;
-use coeleo_theme::{ACCENT, BG, DIM, PAD, SURFACE, TEXT};
+use coeleo_theme::{ACCENT, BORDER, DIM, PAD, SURFACE, TEXT};
 
 use super::nav::{crumb_start, nav_layout, path_segments};
 use super::{
@@ -14,6 +14,7 @@ use super::{
 
 pub(super) fn paint_navbar(s: &State, w: u32, d: &mut impl Draw) {
     d.fill(0, 0, w, NAV_H, SURFACE);
+    d.fill(0, NAV_H.saturating_sub(1), w, 1, BORDER);
     let by = (NAV_H.saturating_sub(coeleo_theme::BUTTON_H)) / 2;
     let nav_h = s.hover;
     let back_en = s.hist_i > 0;
@@ -108,9 +109,9 @@ pub(super) fn paint_crumbs(s: &State, w: u32, d: &mut impl Draw) {
 pub(super) fn paint_sidebar(s: &State, h: u32, d: &mut impl Draw) {
     let sh = h.saturating_sub(NAV_H).saturating_sub(STATUS_H);
     d.fill(0, NAV_H, SIDE_W, sh, SURFACE);
-    d.fill(SIDE_W.saturating_sub(1), NAV_H, 1, sh, BG);
+    d.fill(SIDE_W.saturating_sub(1), NAV_H, 1, sh, BORDER);
     let mut y = NAV_H + PAD / 2;
-    d.text(PAD, y, "Places", DIM);
+    d.text(PAD, y, "PLACES", DIM);
     y += ROW_H;
     paint_side_row(s, d, y, SideHit::Root, Icon::Folder, ACCENT, "/");
     y += ROW_H;
@@ -118,13 +119,13 @@ pub(super) fn paint_sidebar(s: &State, h: u32, d: &mut impl Draw) {
         paint_side_row(s, d, y, SideHit::Docs, Icon::Folder, ACCENT, "docs");
         y += ROW_H;
     }
-    d.text(PAD, y, "Devices", DIM);
+    d.text(PAD, y, "DEVICES", DIM);
     y += ROW_H;
     let vol = crate::fs::volume_label();
     let label = vol.as_deref().unwrap_or("Live disk");
     paint_side_row(s, d, y, SideHit::Vol, Icon::App, TEXT, label);
     y += ROW_H;
-    d.text(PAD, y, "Folders", DIM);
+    d.text(PAD, y, "FOLDERS", DIM);
     y += ROW_H;
     if s.tree_open {
         let mut i = 0u8;
@@ -145,7 +146,7 @@ pub(super) fn paint_side_row(
     y: u32,
     hit: SideHit,
     ic: Icon,
-    _ic_color: u32,
+    ic_color: u32,
     label: &str,
 ) {
     let current = match hit {
@@ -154,13 +155,14 @@ pub(super) fn paint_side_row(
         SideHit::Vol | SideHit::Tree(_) => false,
     };
     let hovered = matches!(s.hover, Some(ChromeHover::Side(h)) if h == hit);
-    d.list_row(
+    d.list_row_colored(
         PAD / 2,
         y,
         SIDE_W.saturating_sub(PAD),
         ROW_H,
         label,
         Some(ic),
+        ic_color,
         current,
         hovered && !current,
     );
@@ -182,7 +184,7 @@ pub(super) fn paint_columns(x: u32, w: u32, d: &mut impl Draw) {
     let sz_x = col_size_x(x, w);
     d.text(sz_x, ty, "Size", DIM);
     d.text(sz_x + SIZE_COL, ty, "Date", DIM);
-    d.fill(x, NAV_H.saturating_add(COL_H).saturating_sub(1), w, 1, BG);
+    d.fill(x, NAV_H.saturating_add(COL_H).saturating_sub(1), w, 1, BORDER);
 }
 
 pub(super) fn paint_row(d: &mut impl Draw, x: u32, y: u32, w: u32, ent: &DirEnt) {
@@ -328,7 +330,8 @@ pub(super) fn fmt_date(t: (u16, u8, u8, u8, u8, u8)) -> String {
 pub(super) fn paint_status(s: &State, w: u32, h: u32, d: &mut impl Draw) {
     let y = h.saturating_sub(STATUS_H);
     d.fill(0, y, w, STATUS_H, SURFACE);
-    let ty = y + (STATUS_H.saturating_sub(coeleo_draw::FONT_H) / 2);
+    d.fill(0, y, w, 1, BORDER);
+    let ty = y + 1 + (STATUS_H.saturating_sub(1).saturating_sub(coeleo_draw::FONT_H) / 2);
     if !s.status_msg.is_empty() {
         d.text_elide(PAD, ty, &s.status_msg, TEXT, w.saturating_sub(PAD));
         return;

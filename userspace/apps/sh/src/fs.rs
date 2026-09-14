@@ -115,11 +115,20 @@ pub fn cmd_sync() {
 }
 
 pub fn cmd_ls(cwd: &Cwd, args: &str) {
+    let mut opt_l = false;
+    let mut path_arg = "";
+    for w in args.split_whitespace() {
+        if w == "-l" {
+            opt_l = true;
+        } else if !w.starts_with('-') && path_arg.is_empty() {
+            path_arg = w;
+        }
+    }
     let mut abs = [0u8; 256];
-    let path = if args.is_empty() {
+    let path = if path_arg.is_empty() {
         cwd.as_str()
     } else {
-        resolve(cwd.as_str(), args, &mut abs)
+        resolve(cwd.as_str(), path_arg, &mut abs)
     };
     let fd = open(path, OPEN_READ);
     if fd == ERR {
@@ -132,12 +141,25 @@ pub fn cmd_ls(cwd: &Cwd, args: &str) {
         if r == 0 || r == ERR {
             break;
         }
+        let is_dir = dirent_is_dir(&ent);
         let name = dirent_name(&ent);
-        let _ = write(1, name.as_bytes());
-        if dirent_is_dir(&ent) {
-            let _ = write(1, b"/");
+        if opt_l {
+            if is_dir {
+                let _ = write(1, b"drwxr-xr-x    - \x1b[1;34m");
+                let _ = write(1, name.as_bytes());
+                let _ = write(1, b"/\x1b[0m\n");
+            } else {
+                let _ = write(1, b"-rw-r--r--    - ");
+                let _ = write(1, name.as_bytes());
+                let _ = write(1, b"\n");
+            }
+        } else {
+            let _ = write(1, name.as_bytes());
+            if is_dir {
+                let _ = write(1, b"/");
+            }
+            let _ = write(1, b"\n");
         }
-        let _ = write(1, b"\n");
     }
     let _ = close(fd);
 }

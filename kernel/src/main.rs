@@ -21,7 +21,8 @@ mod net;
 mod task;
 mod ui;
 
-pub(crate) use boot::{acpi, console, gdt, init, interrupts, lapic, rtc, serial, shell};
+#[allow(unused_imports)]
+pub(crate) use boot::{acpi, console, gdt, init, interrupts, kdebug, lapic, rtc, serial, shell};
 pub(crate) use bus::{pci, xhci};
 pub(crate) use fs::{ahci, blk, fat_disk, gpt, install, part, usb_msc};
 pub(crate) use input::{kbd, mouse, ps2, uhci, usb_hid};

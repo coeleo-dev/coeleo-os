@@ -4,11 +4,7 @@
 include!(concat!(env!("OUT_DIR"), "/font_atlas.rs"));
 
 pub fn idx(c: u8) -> usize {
-    if (32..127).contains(&c) {
-        (c - 32) as usize
-    } else {
-        0
-    }
+    c as usize
 }
 
 pub fn advance(c: u8) -> u32 {

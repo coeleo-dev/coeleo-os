@@ -16,7 +16,7 @@ use crate::vmm;
 use coeleo_theme::{DECO_H, SHADOW_PX};
 
 const ERR: u64 = u64::MAX;
-const MAX_SURFACES: usize = 4;
+const MAX_SURFACES: usize = 8;
 const MAX_DIM: u32 = 256;
 const ORIGIN_X: u32 = 16;
 const ORIGIN_Y: u32 = 8;
@@ -122,9 +122,11 @@ pub fn sys_create(w: u64, h: u64, buf: u64) -> u64 {
     }
     let (ox, oy) = place(w, h);
     let mut g = WIN.lock();
-    let Some(slot) = g.slots.iter().position(|s| s.is_none()) else {
+    let free_slot = g.slots.iter().position(|s| s.is_none());
+    if free_slot.is_none() {
         return ERR;
-    };
+    }
+    let slot = free_slot.unwrap();
     let id = slot as u32 + 1;
     g.slots[slot] = Some(Surface {
         id,
@@ -282,7 +284,8 @@ pub fn drop_pid(pid: u32) {
     let mut g = WIN.lock();
     for slot in g.slots.iter_mut() {
         if slot.as_ref().is_some_and(|s| s.pid == pid) {
-            ids[n] = slot.as_ref().unwrap().id;
+            let id = slot.as_ref().unwrap().id;
+            ids[n] = id;
             n += 1;
             *slot = None;
         }

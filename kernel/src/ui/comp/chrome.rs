@@ -92,7 +92,7 @@ pub(super) fn handle_panel_click(st: &mut State, x: u32, y: u32) {
             close_runner(st);
             handle_task_close(st, k);
         }
-        panel::Hit::Clock | panel::Hit::None => {
+        panel::Hit::Clock | panel::Hit::Net | panel::Hit::None => {
             close_launcher(st);
             close_runner(st);
             close_desk_menu(st);
@@ -114,8 +114,12 @@ pub(super) fn handle_task_click(st: &mut State, k: usize) {
         minimize_frame(st, i);
         return;
     }
+    let old_top = visible_top(st);
     raise_visible(st, i);
     focus_frame(st, i);
+    if let Some(ot) = old_top {
+        present_damage(st, shadow_rect(&st.frames[ot]), false);
+    }
     present_damage(st, shadow_rect(&st.frames[st.frames.len() - 1]), false);
 }
 
@@ -312,12 +316,16 @@ pub(super) fn handle_files_menu_click(st: &mut State, x: u32, y: u32) -> bool {
 pub(super) fn desk_menu_activate(st: &mut State) {
     close_desk_menu(st);
     crate::deskset::refresh();
+    let old_top = visible_top(st);
     let Some(i) = ensure_frame(st, FrameKind::Settings) else {
         return;
     };
     st.frames[i].minimized = false;
     raise(st, i);
     focus_frame(st, st.frames.len() - 1);
+    if let Some(ot) = old_top {
+        present_damage(st, shadow_rect(&st.frames[ot]), false);
+    }
     present_damage(st, shadow_rect(&st.frames[st.frames.len() - 1]), false);
     paint_strut(st);
 }
@@ -356,6 +364,21 @@ pub(super) fn runner_enter(st: &mut State) {
     runner_launch(st, st.runner_sel);
 }
 
+pub(super) fn show_toast(st: &mut State, msg: &str) {
+    st.toast = alloc::string::String::from(msg);
+    st.toast_at = crate::clock::ticks();
+    let w = coeleo_draw::text_width(msg).saturating_add(32);
+    let x = st.fb.w.saturating_sub(w) / 2;
+    let y = panel::work_h(st.fb.h).saturating_sub(40);
+    let r = Rect {
+        x0: x,
+        y0: y,
+        x1: x + w,
+        y1: y + 32,
+    };
+    present_damage(st, r, true);
+}
+
 pub(super) fn runner_launch(st: &mut State, row: usize) {
     let Some(name) = st.runner_list.get(row).cloned() else {
         return;
@@ -364,13 +387,27 @@ pub(super) fn runner_launch(st: &mut State, row: usize) {
     if focus_named(st, &name) {
         return;
     }
+    if name == "edit" {
+        serial::write_str("run: edit\n");
+        focus_named(st, "sh");
+        crate::kbd::enqueue_str("edit notes.txt\n");
+        return;
+    }
     match spawn_app(&name) {
-        Some(_) => {
+        Some(_pid) => {
             serial::write_str("run: ");
             serial::write_str(&name);
             serial::write_str("\n");
+            if name == "hello" {
+                show_toast(st, "hello: executado no terminal");
+            } else if name == "winprobe" {
+                show_toast(st, "winprobe: teste unitario executado");
+            }
         }
-        None => serial::write_str("run: not found\n"),
+        None => {
+            serial::write_str("run: not found\n");
+            show_toast(st, "Comando nao encontrado");
+        }
     }
 }
 
@@ -392,7 +429,21 @@ pub(super) fn launch_index(st: &mut State, row: usize) {
     if focus_named(st, &name) {
         return;
     }
-    let _ = spawn_app(&name);
+    if name == "edit" {
+        focus_named(st, "sh");
+        crate::kbd::enqueue_str("edit notes.txt\n");
+        return;
+    }
+    let res = spawn_app(&name);
+    if res.is_none() {
+        show_toast(st, "Falha ao iniciar app");
+    } else {
+        if name == "hello" {
+            show_toast(st, "hello: executado no terminal");
+        } else if name == "winprobe" {
+            show_toast(st, "winprobe: teste unitario executado");
+        }
+    }
 }
 
 pub(super) fn open_power_dlg(st: &mut State, kind: PowerKind) {
@@ -476,12 +527,16 @@ pub(super) fn focus_named(st: &mut State, name: &str) -> bool {
         "files" => FrameKind::Files,
         _ => return false,
     };
+    let old_top = visible_top(st);
     let Some(i) = ensure_frame(st, kind) else {
         return true;
     };
     st.frames[i].minimized = false;
     raise(st, i);
     focus_frame(st, st.frames.len() - 1);
+    if let Some(ot) = old_top {
+        present_damage(st, shadow_rect(&st.frames[ot]), false);
+    }
     present_damage(st, shadow_rect(&st.frames[st.frames.len() - 1]), false);
     paint_strut(st);
     true

@@ -216,6 +216,7 @@ pub trait Draw {
     fn vsep(&mut self, x: u32, y: u32, h: u32) {
         let _ = (x, y, h);
     }
+    #[allow(dead_code)]
     fn list_row(
         &mut self,
         x: u32,
@@ -224,6 +225,20 @@ pub trait Draw {
         h: u32,
         label: &str,
         icon: Option<Icon>,
+        selected: bool,
+        hovered: bool,
+    ) {
+        self.list_row_colored(x, y, w, h, label, icon, TEXT, selected, hovered);
+    }
+    fn list_row_colored(
+        &mut self,
+        x: u32,
+        y: u32,
+        w: u32,
+        h: u32,
+        label: &str,
+        icon: Option<Icon>,
+        icon_color: u32,
         selected: bool,
         hovered: bool,
     ) {
@@ -238,7 +253,7 @@ pub trait Draw {
                 ic,
                 tx,
                 y.saturating_add(h.saturating_sub(coeleo_draw::ICON) / 2),
-                TEXT,
+                icon_color,
             );
             tx = tx.saturating_add(coeleo_draw::ICON + PAD / 2);
         }
@@ -527,6 +542,27 @@ pub fn enter() {
         return;
     }
     activate(&mut s);
+}
+
+pub fn copy_path() {
+    let mut g = STATE.lock();
+    let st = &mut *g;
+    let n = visible(st).len();
+    if n == 0 || st.sel >= n {
+        return;
+    }
+    let e = visible(st)[st.sel].clone();
+    drop(g);
+    let mut buf = String::new();
+    let st_g = STATE.lock();
+    if st_g.cwd != "/" {
+        buf.push_str(&st_g.cwd);
+        buf.push('/');
+    } else {
+        buf.push('/');
+    }
+    buf.push_str(&e.name);
+    crate::ui::comp::clip::sys_clipboard(1, buf.as_ptr() as u64, buf.len() as u64);
 }
 
 pub fn esc() {

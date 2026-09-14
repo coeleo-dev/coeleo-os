@@ -6,15 +6,12 @@ use crate::fbterm::FbInfo;
 use crate::serial;
 use coeleo_draw::{self, Clip, Icon, Target};
 use coeleo_theme::{
-    ACCENT, BG, DIM, PAD, PANEL_ALPHA, PANEL_BG, PANEL_H, PANEL_INSET, PANEL_MARGIN, RADIUS,
-    TASK_ICON, TEXT,
+    ACCENT, BG, BORDER, DIM, PAD, PANEL_ALPHA, PANEL_BG, PANEL_H, PANEL_INSET, PANEL_MARGIN,
+    RADIUS, RADIUS_SM, TASK_ICON, TEXT,
 };
 
 pub const SLOT: u32 = TASK_ICON;
 const TIP_GAP: u32 = PAD / 2;
-const PILL_H: u32 = 4;
-const PILL_INSET: u32 = 3;
-const PILL_R: u32 = 2;
 const MODE_FLOAT: u8 = 0;
 const MODE_FULL: u8 = 1;
 static MODE: AtomicU8 = AtomicU8::new(MODE_FLOAT);
@@ -57,6 +54,7 @@ pub enum Hit {
     Task(usize),
     TaskClose(usize),
     Clock,
+    Net,
 }
 
 #[derive(Clone, Copy)]
@@ -131,6 +129,13 @@ fn slot_h() -> u32 {
     PANEL_H.saturating_sub(PANEL_INSET.saturating_mul(2))
 }
 
+fn tray_geom(x1: u32, clock_w: u32) -> (u32, u32, u32) {
+    let clock_x0 = x1.saturating_sub(PAD + clock_w);
+    let net_x = clock_x0.saturating_sub(coeleo_draw::ICON + PAD);
+    let sep_x = net_x.saturating_sub(PAD);
+    (sep_x, net_x, clock_x0)
+}
+
 pub fn paint(
     fb: FbInfo,
     clock_mmss: &str,
@@ -168,25 +173,39 @@ pub fn paint(
     coeleo_draw::icon(t, Icon::Search, kx + ioff, iy, TEXT, clip);
     coeleo_draw::vsep(t, sx0 + SLOT * 2, iy0 + 2, sh.saturating_sub(4), clip);
     let clock_w = clock_w(clock_mmss);
-    let cx = x1.saturating_sub(PAD + clock_w);
+    let (sep_x, net_x, clock_x0) = tray_geom(x1, clock_w);
     let mut sx = sx0 + SLOT * 2;
     let overflow = coeleo_draw::FONT_W;
     let mut hidden = false;
     for (i, task) in tasks.iter().enumerate() {
-        if sx.saturating_add(SLOT) + clock_w + PAD * 2 + overflow > x1 {
+        if sx.saturating_add(SLOT) + overflow > sep_x {
             hidden = i < tasks.len();
             break;
         }
         let hit = Hit::Task(i);
+        if task.focused {
+            coeleo_draw::fill_round(t, sx, iy0, SLOT, sh, RADIUS_SM, 0x0022_2A38, clip);
+        }
         slot_bg(t, sx, iy0, hit, hover, pressed, clip);
-        coeleo_draw::icon(t, task.icon, sx + ioff, iy, TEXT, clip);
+        let icon_color = if task.minimized { DIM } else { TEXT };
+        coeleo_draw::icon(t, task.icon, sx + ioff, iy, icon_color, clip);
         paint_pill(t, sx, y0, task, clip);
         sx = sx.saturating_add(SLOT);
     }
     if hidden {
-        coeleo_draw::text(t, sx, ty, ">", DIM, cx, clip);
+        coeleo_draw::text(t, sx, ty, ">", DIM, sep_x, clip);
     }
-    coeleo_draw::text(t, cx, ty, clock_mmss, TEXT, x1, clip);
+    coeleo_draw::vsep(t, sep_x, iy0 + 2, sh.saturating_sub(4), clip);
+    if hover == Hit::Net {
+        coeleo_draw::hover_fill(t, net_x.saturating_sub(2), iy0, coeleo_draw::ICON + 4, sh, clip);
+    }
+    let net_color = if crate::net::is_up() {
+        ACCENT
+    } else {
+        DIM
+    };
+    coeleo_draw::icon(t, Icon::Network, net_x, iy, net_color, clip);
+    coeleo_draw::text(t, clock_x0, ty, clock_mmss, TEXT, x1, clip);
     paint_tip(t, fb.w, fb.h, tasks, hover, clip)
 }
 
@@ -196,9 +215,9 @@ pub fn paint_clock(fb: FbInfo, clock_mmss: &str, opaque: bool, wall: Option<(&[u
     let y0 = bar_y(fb.h);
     let x1 = bar_x1(fb.w);
     let tw = clock_w(clock_mmss);
-    let cx = x1.saturating_sub(PAD + tw);
+    let (_, _, clock_x0) = tray_geom(x1, tw);
     let clip = Clip {
-        x0: cx.saturating_sub(2),
+        x0: clock_x0.saturating_sub(2),
         y0,
         x1,
         y1: y0.saturating_add(PANEL_H).min(fb.h),
@@ -215,18 +234,18 @@ pub fn paint_clock(fb: FbInfo, clock_mmss: &str, opaque: bool, wall: Option<(&[u
     let bw = x1.saturating_sub(x0);
     fill_bar(t, x0, y0, bw, opaque, clip);
     let ty = slot_y0(y0) + (slot_h().saturating_sub(coeleo_draw::FONT_H)) / 2;
-    coeleo_draw::text(t, cx, ty, clock_mmss, TEXT, x1, clip);
+    coeleo_draw::text(t, clock_x0, ty, clock_mmss, TEXT, x1, clip);
 }
 
 pub fn clock_rect(fb_w: u32, fb_h: u32, clock_mmss: &str) -> (u32, u32, u32, u32) {
     let y0 = bar_y(fb_h);
     let x1 = bar_x1(fb_w);
     let tw = clock_w(clock_mmss);
-    let cx = x1.saturating_sub(PAD + tw);
+    let (_, _, clock_x0) = tray_geom(x1, tw);
     (
-        cx.saturating_sub(2),
+        clock_x0.saturating_sub(2),
         y0,
-        x1.saturating_sub(cx.saturating_sub(2)),
+        x1.saturating_sub(clock_x0.saturating_sub(2)),
         PANEL_H,
     )
 }
@@ -256,14 +275,17 @@ pub fn hit(x: u32, y: u32, fb_w: u32, fb_h: u32, tasks: &[TaskInfo], clock_mmss:
         return Hit::KRunner;
     }
     let tw = clock_w(clock_mmss);
-    let clock_x0 = x1.saturating_sub(PAD + tw);
+    let (sep_x, net_x, clock_x0) = tray_geom(x1, tw);
     if x >= clock_x0 {
         return Hit::Clock;
+    }
+    if x >= net_x && x < clock_x0 {
+        return Hit::Net;
     }
     let tasks_x0 = x0 + SLOT * 2;
     let rel = x.saturating_sub(tasks_x0);
     let i = (rel / SLOT) as usize;
-    let max_fit = (clock_x0.saturating_sub(tasks_x0) / SLOT) as usize;
+    let max_fit = (sep_x.saturating_sub(tasks_x0) / SLOT) as usize;
     if x >= tasks_x0 && i < tasks.len() && i < max_fit {
         Hit::Task(i)
     } else {
@@ -283,9 +305,9 @@ fn tip_task(
     let x0 = slot_x0();
     let x1 = bar_x1(fb_w);
     let tw = clock_w(clock_mmss);
-    let clock_x0 = x1.saturating_sub(PAD + tw);
+    let (sep_x, _, _) = tray_geom(x1, tw);
     let tasks_x0 = x0 + SLOT * 2;
-    let max_fit = (clock_x0.saturating_sub(tasks_x0) / SLOT) as usize;
+    let max_fit = (sep_x.saturating_sub(tasks_x0) / SLOT) as usize;
     let n = tasks.len().min(max_fit);
     for i in 0..n {
         let sx = tasks_x0 + i as u32 * SLOT;
@@ -314,6 +336,17 @@ fn paint_tip(t: Target, fb_w: u32, fb_h: u32, tasks: &[TaskInfo], hover: Hit, cl
         }
         Hit::Launcher => tip_at(t, fb_w, fb_h, slot_x0(), "Applications", clip),
         Hit::KRunner => tip_at(t, fb_w, fb_h, slot_x0() + SLOT, "Search", clip),
+        Hit::Net => {
+            let msg = if crate::net::is_up() {
+                "Network: Connected"
+            } else if crate::net::has_nic() {
+                "Network: Disconnected"
+            } else {
+                "Network: No Interface"
+            };
+            let (_, net_x, _) = tray_geom(bar_x1(fb_w), clock_w("??:??"));
+            tip_at(t, fb_w, fb_h, net_x, msg, clip)
+        }
         Hit::Clock => {
             let mut date = [0u8; 16];
             let Some(s) = crate::rtc::format_ymd(&mut date) else {
@@ -399,6 +432,7 @@ fn fill_bar(t: Target, x0: u32, y0: u32, bw: u32, opaque: bool, clip: Clip) {
                     clip,
                 );
             }
+            coeleo_draw::stroke_round(t, x0, y0, bw, PANEL_H, RADIUS, BORDER, clip);
         }
         Mode::Full => {
             let y1 = y0.saturating_add(PANEL_H);
@@ -418,6 +452,9 @@ fn fill_bar(t: Target, x0: u32, y0: u32, bw: u32, opaque: bool, clip: Clip) {
                     coeleo_draw::fill_span_blend(t, xs, y, w, PANEL_BG, PANEL_ALPHA);
                 }
             }
+            if y0 >= clip.y0 && y0 < clip.y1 && y0 < t.h {
+                coeleo_draw::fill_span(t, xs, y0, w, BORDER);
+            }
         }
     }
 }
@@ -432,14 +469,17 @@ fn slot_bg(t: Target, x: u32, y: u32, which: Hit, hover: Hit, pressed: Hit, clip
 }
 
 fn paint_pill(t: Target, sx: u32, y0: u32, task: &TaskInfo, clip: Clip) {
-    let color = if task.focused { ACCENT } else { DIM };
-    let w = SLOT.saturating_sub(PILL_INSET * 2);
-    let x = sx.saturating_add(PILL_INSET);
-    let y = y0.saturating_add(PANEL_H.saturating_sub(PANEL_INSET + PILL_H));
-    if w == 0 {
-        return;
+    if task.focused {
+        let w = 16u32;
+        let x = sx.saturating_add((SLOT.saturating_sub(w)) / 2);
+        let y = y0.saturating_add(PANEL_H.saturating_sub(PANEL_INSET + 3));
+        coeleo_draw::fill_round(t, x, y, w, 3, 1, ACCENT, clip);
+    } else if !task.minimized {
+        let w = 4u32;
+        let x = sx.saturating_add((SLOT.saturating_sub(w)) / 2);
+        let y = y0.saturating_add(PANEL_H.saturating_sub(PANEL_INSET + 4));
+        coeleo_draw::fill_round(t, x, y, w, 4, 2, DIM, clip);
     }
-    coeleo_draw::fill_round(t, x, y, w, PILL_H, PILL_R, color, clip);
 }
 
 fn clock_w(clock_mmss: &str) -> u32 {

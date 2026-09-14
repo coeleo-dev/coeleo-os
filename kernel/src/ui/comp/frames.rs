@@ -51,9 +51,13 @@ pub(super) fn minimize_frame(st: &mut State, i: usize) {
 }
 
 pub(super) fn restore_min(st: &mut State, i: usize) {
+    let old_top = visible_top(st);
     st.frames[i].minimized = false;
     raise(st, i);
     focus_frame(st, i);
+    if let Some(ot) = old_top {
+        present_damage(st, shadow_rect(&st.frames[ot]), false);
+    }
     present_damage(st, shadow_rect(&st.frames[st.frames.len() - 1]), false);
     sync_panel_mode(st);
     paint_strut(st);
@@ -121,6 +125,7 @@ pub(super) fn retarget_focus(st: &mut State) {
     };
     focus_frame(st, i);
     sync_client_top(st);
+    present_damage(st, shadow_rect(&st.frames[i]), false);
 }
 
 pub(super) fn sync_client_top(st: &State) {

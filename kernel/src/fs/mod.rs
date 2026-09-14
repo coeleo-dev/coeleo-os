@@ -16,6 +16,7 @@ use spin::Mutex;
 
 use crate::fat_disk::FatDisk;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FsError {
     NoFs,
     NotFound,

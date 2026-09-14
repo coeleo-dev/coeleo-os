@@ -244,11 +244,26 @@ impl fm::Draw for FilesSink {
         selected: bool,
         hovered: bool,
     ) {
+        self.list_row_colored(x, y, w, h, label, icon, coeleo_theme::TEXT, selected, hovered);
+    }
+
+    fn list_row_colored(
+        &mut self,
+        x: u32,
+        y: u32,
+        w: u32,
+        h: u32,
+        label: &str,
+        icon: Option<Icon>,
+        icon_color: u32,
+        selected: bool,
+        hovered: bool,
+    ) {
         let t = tgt(self.fb);
         let sx = self.ox.saturating_add(x);
         let sy = self.oy.saturating_add(y);
         self.with_clips(|c| {
-            coeleo_draw::list_row(t, sx, sy, w, h, label, icon, selected, hovered, c);
+            coeleo_draw::list_row_fg(t, sx, sy, w, h, label, icon, selected, hovered, icon_color, c);
         });
     }
 }

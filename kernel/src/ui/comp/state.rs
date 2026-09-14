@@ -129,6 +129,8 @@ pub(super) struct State {
     pub(super) runner_caret: bool,
     pub(super) title_click_at: u64,
     pub(super) title_click_kind: Option<FrameKind>,
+    pub(super) toast: String,
+    pub(super) toast_at: u64,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -170,3 +172,4 @@ pub(super) const KEY_RUNNER: u8 = 7;
 pub(super) const KEY_LEFT: u8 = 8;
 pub(super) const KEY_RIGHT: u8 = 9;
 pub(super) const KEY_DEL: u8 = 10;
+pub(super) const KEY_COPY: u8 = 11;
