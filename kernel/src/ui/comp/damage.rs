@@ -1,10 +1,8 @@
 //! Dirty-rect coalesce and flush to the framebuffer.
 
 use super::geom::{fb_rect, is_strut_rect};
-use super::rect::{
-    rect_intersect, rect_intersects, rect_is_empty, rect_union, Rect,
-};
-use super::state::{State, DAMAGE_CAP};
+use super::rect::{Rect, rect_intersect, rect_intersects, rect_is_empty, rect_union};
+use super::state::{DAMAGE_CAP, State};
 
 pub(super) fn rect_gap2(a: Rect, b: Rect) -> u64 {
     if rect_intersects(a, b) {

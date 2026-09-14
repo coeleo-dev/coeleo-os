@@ -14,7 +14,7 @@ The target is a weak PC — one core, ~512 MiB, software framebuffer, no 3D GPU.
                                     └── 2D compositor, disk, input
 ```
 
-Normative spec: [docs/requirements/coeleo-os-specification-v02.md](docs/requirements/coeleo-os-specification-v02.md). How to write code: [AGENTS.md](AGENTS.md). Map and lib sheets: [docs/contrib/](docs/contrib/).
+How to write code: [AGENTS.md](AGENTS.md). Map and lib sheets: [docs/contrib/](docs/contrib/).
 
 ## What it does
 
@@ -30,7 +30,7 @@ Normative spec: [docs/requirements/coeleo-os-specification-v02.md](docs/requirem
 
 **Power.** ACPI reboot/shutdown and RTC (civil date).
 
-Out of scope: Linux ABI, POSIX, SMP, Wi-Fi, 3D GPU, TLS, a dynamic linker, compositor in Ring 3. After phases 1–15: [docs/roadmap-pos-fase-15.md](docs/roadmap-pos-fase-15.md). Next: [installer](docs/requirements/demands/PHASE-17/phase-17-installer.md).
+Out of scope: Linux ABI, POSIX, SMP, Wi-Fi, 3D GPU, TLS, a dynamic linker, compositor in Ring 3.
 
 ## Architecture
 
@@ -65,7 +65,7 @@ Detail: [docs/contrib/architecture.md](docs/contrib/architecture.md).
 | [libcoeleo](docs/contrib/libs/libcoeleo.md) | Syscall wrappers (no `alloc`) | yes | every ELF |
 | [libcoeleoui](docs/contrib/libs/libcoeleoui.md) | Immediate-mode widgets | yes | `widgets`, `install` |
 | [coeleo-theme](docs/contrib/libs/coeleo-theme.md) | Palette and metrics (`PAD`, `ACCENT`, `DECO_H`, …) | yes | kernel, draw, ui |
-| [coeleo-draw](docs/contrib/libs/coeleo-draw.md) | Primitives (round fill, text, icons, ~11 px atlas) | yes | kernel, libcoeleoui |
+| [coeleo-draw](docs/contrib/libs/coeleo-draw.md) | Primitives (round fill, proportional text, icons) | yes | kernel, libcoeleoui |
 | [coeleo-image](docs/contrib/libs/coeleo-image.md) | JPEG/PNG (wallpaper, preview) | **no** | kernel only |
 | [pkg](docs/contrib/libs/pkg.md) | Parse/verify `.coe` | yes | `sh`; `coe-pack` on the host |
 
@@ -79,13 +79,14 @@ Static ELFs in `userspace/apps/`. `_start` instead of `main`.
 
 | App | Role |
 | --- | --- |
-| `sh` | Shell: fs, `ps`, `ping`, `get`, `pkg`, `install` |
-| `ls`, `cat` | List / read |
+| `sh` | Shell: fs, `mkdir`/`cp`/`mv`, `echo`/`pwd`, `ps`, `ping`, `get`, `pkg`, `install` |
+| `ls`, `cat`, `echo` | List / read / print args |
 | `hello`, `fault` | Spawn and fault accept |
 | `clock`, `spin` | Background and CPU; Ctrl+C |
 | `winprobe` | Ring 3 surface (`win_create`) |
 | `widgets` | Toolkit (`libcoeleoui`) |
 | `install` | Installer (GUI) |
+| `edit` | TUI editor on the VT (`^S` save, `^Q` quit) |
 
 ## Run
 

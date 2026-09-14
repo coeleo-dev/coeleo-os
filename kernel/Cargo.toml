@@ -16,10 +16,17 @@ smoltcp = { version = "0.12", default-features = false, features = [
     "alloc",
     "medium-ethernet",
     "proto-ipv4",
+    "proto-dhcpv4",
+    "proto-dns",
     "socket-icmp",
     "socket-tcp",
     "socket-tcp-reno",
+    "socket-dhcpv4",
+    "socket-dns",
 ] }
+rustls = { version = "0.23", default-features = false, features = ["tls12", "custom-provider", "hashbrown"] }
+rustls-rustcrypto = { version = "0.0.2-alpha", default-features = false, features = ["alloc", "tls12"] }
+getrandom = { version = "0.2", default-features = false, features = ["custom"] }
 spin = "0.10"
 talc = "4"
 uart_16550 = "0.3"

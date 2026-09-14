@@ -10,6 +10,8 @@ members = [
     "apps/sh",
     "apps/ls",
     "apps/cat",
+    "apps/echo",
+    "apps/edit",
     "apps/clock",
     "apps/spin",
     "apps/winprobe",

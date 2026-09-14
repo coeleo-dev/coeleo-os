@@ -2,20 +2,20 @@
 
 use alloc::vec::Vec;
 
-use super::rect::{rect_contains, Rect};
+use super::rect::{Rect, rect_contains};
 use super::state::{Frame, FrameKind, State};
 use crate::panel;
 use coeleo_draw::Icon;
 use coeleo_theme::{DECO_H, GAP, PANEL_MARGIN, SHADOW_OFF, SHADOW_PX};
 
-pub(super) const LAUNCH_NAMES: [&str; 4] = ["hello", "widgets", "winprobe", "install"];
+pub(super) const LAUNCH_NAMES: [&str; 5] = ["hello", "widgets", "winprobe", "install", "edit"];
 pub(super) const LAUNCH_ROW: u32 = coeleo_draw::FONT_H + coeleo_theme::GAP;
 pub(super) const LAUNCH_W: u32 = 196;
 pub(super) const LAUNCH_PAD: u32 = coeleo_theme::PAD;
 pub(super) const LAUNCH_SEP: u32 = 1;
 pub(super) const POWER_FOOTER: u32 = 2;
 pub(super) const CONFIRM_W: u32 = 288;
-pub(super) const CONFIRM_BTN_H: u32 = coeleo_draw::FONT_H + coeleo_theme::PAD;
+pub(super) const CONFIRM_BTN_H: u32 = coeleo_theme::BUTTON_H;
 
 pub(super) fn h_work(st: &State) -> u32 {
     panel::work_h(st.fb.h)
@@ -55,6 +55,7 @@ pub(super) fn app_label(name: &str) -> &str {
         "widgets" => "Widgets",
         "winprobe" => "Winprobe",
         "install" => "Install Coeleo",
+        "edit" => "Edit",
         other => other,
     }
 }
@@ -104,12 +105,12 @@ pub(super) fn launcher_shadow(st: &State) -> Rect {
 }
 
 const DESK_MENU_W: u32 = 180;
+const FILES_MENU_W: u32 = 160;
+const FILES_MENU_N: u32 = 3;
 
 pub(super) fn desk_menu_popup(st: &State) -> Rect {
     let work = h_work(st);
-    let h = LAUNCH_PAD
-        .saturating_mul(2)
-        .saturating_add(LAUNCH_ROW);
+    let h = LAUNCH_PAD.saturating_mul(2).saturating_add(LAUNCH_ROW);
     let w = DESK_MENU_W.min(st.fb.w);
     let mut x0 = st.desk_menu_x;
     let mut y0 = st.desk_menu_y;
@@ -136,6 +137,46 @@ pub(super) fn desk_menu_row_at(st: &State, x: u32, y: u32) -> bool {
     rect_contains(p, x, y)
 }
 
+pub(super) fn files_menu_popup(st: &State) -> Rect {
+    let work = h_work(st);
+    let h = LAUNCH_PAD
+        .saturating_mul(2)
+        .saturating_add(LAUNCH_ROW.saturating_mul(FILES_MENU_N));
+    let w = FILES_MENU_W.min(st.fb.w);
+    let mut x0 = st.files_menu_x;
+    let mut y0 = st.files_menu_y;
+    if x0.saturating_add(w) > st.fb.w {
+        x0 = st.fb.w.saturating_sub(w);
+    }
+    if y0.saturating_add(h) > work {
+        y0 = work.saturating_sub(h);
+    }
+    Rect {
+        x0,
+        y0,
+        x1: x0.saturating_add(w),
+        y1: y0.saturating_add(h),
+    }
+}
+
+pub(super) fn files_menu_shadow(st: &State) -> Rect {
+    overlay_shadow(st, files_menu_popup(st))
+}
+
+pub(super) fn files_menu_row_at(st: &State, x: u32, y: u32) -> Option<usize> {
+    let p = files_menu_popup(st);
+    if !rect_contains(p, x, y) {
+        return None;
+    }
+    let rel = y.saturating_sub(p.y0.saturating_add(LAUNCH_PAD));
+    let i = (rel / LAUNCH_ROW) as usize;
+    if i < FILES_MENU_N as usize {
+        Some(i)
+    } else {
+        None
+    }
+}
+
 fn overlay_shadow(st: &State, op: Rect) -> Rect {
     let up = SHADOW_PX.saturating_sub(SHADOW_OFF);
     Rect {
@@ -156,11 +197,7 @@ pub(super) fn launcher_row_at(st: &State, x: u32, y: u32) -> Option<usize> {
     let apps_h = (n as u32).saturating_mul(LAUNCH_ROW);
     if rel < apps_h {
         let i = (rel / LAUNCH_ROW) as usize;
-        if i < n {
-            Some(i)
-        } else {
-            None
-        }
+        if i < n { Some(i) } else { None }
     } else {
         let r2 = rel.saturating_sub(apps_h.saturating_add(LAUNCH_SEP));
         let i = (r2 / LAUNCH_ROW) as usize;
@@ -211,8 +248,11 @@ pub(super) fn confirm_shadow(st: &State) -> Rect {
 
 pub(super) fn confirm_btns(st: &State) -> (Rect, Rect) {
     let p = confirm_popup(st);
-    let by = p.y1.saturating_sub(coeleo_theme::PAD.saturating_add(CONFIRM_BTN_H));
-    let inner = p.x1.saturating_sub(p.x0).saturating_sub(coeleo_theme::PAD * 3);
+    let by =
+        p.y1.saturating_sub(coeleo_theme::PAD.saturating_add(CONFIRM_BTN_H));
+    let inner =
+        p.x1.saturating_sub(p.x0)
+            .saturating_sub(coeleo_theme::PAD * 3);
     let bw = inner / 2;
     let cancel = Rect {
         x0: p.x0.saturating_add(coeleo_theme::PAD),
@@ -388,4 +428,3 @@ pub(super) fn task_frame(st: &State, k: usize) -> Option<usize> {
     }
     None
 }
-

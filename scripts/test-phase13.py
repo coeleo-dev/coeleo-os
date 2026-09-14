@@ -371,8 +371,8 @@ def main() -> int:
                     return fail("launcher did not open files", serial)
 
                 # Clamp to (0,0), then first Files row:
-                # frame (48, 48) + DECO_H(32) + NAV_H(32) + COL_H(14+8=22) + 8
-                # list x = ox + SIDE_W(160) + PAD(8) → (216, 142) on 8px grid (216, 144).
+                # frame (48, 48) + DECO_H(32) + NAV_H(32) + COL_H(FONT_H+GAP) + 8
+                # list x = ox + SIDE_W(160) + PAD(8) → (216, ~142) on 8px grid (216, 144).
                 for _ in range(40):
                     send_rel(sock, -40, -40)
                     time.sleep(0.05)
@@ -387,9 +387,10 @@ def main() -> int:
                 serial = wait_file_contains(serial_log, "focus: files", 5)
                 if "focus: files" not in serial:
                     return fail("click did not focus files", serial)
+                send_click(sock)
                 serial = wait_file_contains(serial_log, "fm: README.TXT", 5)
                 if "fm: README.TXT" not in serial:
-                    return fail("click did not open README.TXT", serial)
+                    return fail("double-click did not open README.TXT", serial)
                 if README_BODY not in serial:
                     return fail("README body missing after click", serial)
 

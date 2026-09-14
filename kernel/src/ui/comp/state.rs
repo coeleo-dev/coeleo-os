@@ -8,11 +8,11 @@ use spin::Mutex;
 
 use crate::fbterm::FbInfo;
 use crate::panel;
-use coeleo_theme::DECO_H;
+use coeleo_theme::DECO_BTN;
 
 use super::rect::Rect;
 
-pub(super) const BTN: u32 = DECO_H;
+pub(super) const BTN: u32 = DECO_BTN;
 pub(super) const DAMAGE_CAP: usize = 8;
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(super) enum Focus {
@@ -101,6 +101,10 @@ pub(super) struct State {
     pub(super) desk_menu_open: bool,
     pub(super) desk_menu_x: u32,
     pub(super) desk_menu_y: u32,
+    pub(super) files_menu_open: bool,
+    pub(super) files_menu_x: u32,
+    pub(super) files_menu_y: u32,
+    pub(super) files_menu_sel: usize,
     pub(super) btn_held: bool,
     pub(super) launch_sel: usize,
     pub(super) launch_list: Vec<String>,
@@ -121,6 +125,7 @@ pub(super) struct State {
     pub(super) power_ok: bool,
     pub(super) power_hover: PowerHover,
     pub(super) deco_hover: Option<Hit>,
+    pub(super) deco_hover_pill: bool,
     pub(super) runner_caret: bool,
     pub(super) title_click_at: u64,
     pub(super) title_click_kind: Option<FrameKind>,
@@ -148,6 +153,7 @@ pub(super) static LAUNCHER_OPEN: AtomicBool = AtomicBool::new(false);
 pub(super) static RUNNER_OPEN: AtomicBool = AtomicBool::new(false);
 pub(super) static POWER_OPEN: AtomicBool = AtomicBool::new(false);
 pub(super) static DESK_MENU_OPEN: AtomicBool = AtomicBool::new(false);
+pub(super) static FILES_MENU_OPEN: AtomicBool = AtomicBool::new(false);
 
 pub(super) const KEY_CAP: usize = 16;
 pub(super) static mut KEY_Q: [u8; KEY_CAP] = [0; KEY_CAP];
@@ -163,3 +169,4 @@ pub(super) const KEY_ESC: u8 = 6;
 pub(super) const KEY_RUNNER: u8 = 7;
 pub(super) const KEY_LEFT: u8 = 8;
 pub(super) const KEY_RIGHT: u8 = 9;
+pub(super) const KEY_DEL: u8 = 10;

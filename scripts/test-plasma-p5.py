@@ -17,7 +17,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SEED_README = os.path.join(ROOT, "disk-seed", "README.TXT")
 SEED_HELLO = os.path.join(ROOT, "disk-seed", "docs", "HELLO.TXT")
 
-# files frame (48, 48), cw=480. Max slot centre (480, 64); min (448, 64).
+# files frame (48, 48), cw=480. Max slot centre (492, 64); min (468, 64).
 # Floating bar: y = fb.h - PANEL_MARGIN - PANEL_H; launcher at
 # PANEL_MARGIN + PANEL_INSET + SLOT/2 (7+4+18 = 29), KRunner next,
 # files pin is the third 36px slot (x = 7+4+72+18 = 101).
@@ -324,7 +324,7 @@ def main() -> int:
                     return fail("launcher did not open files", serial)
 
                 clamp_origin(sock)
-                move_by_steps(sock, 480, 64)
+                move_by_steps(sock, 492, 64)
                 send_click(sock)
                 serial = wait_file_contains(serial_log, "panel: opaque", 5)
                 if "panel: opaque" not in serial:
@@ -342,7 +342,7 @@ def main() -> int:
                     return fail("restore did not log panel: alpha again", serial)
 
                 clamp_origin(sock)
-                move_by_steps(sock, 448, 64)
+                move_by_steps(sock, 468, 64)
                 send_click(sock)
                 serial = wait_file_contains(serial_log, "wm: min", 5)
                 if "wm: min" not in serial:

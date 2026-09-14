@@ -17,6 +17,8 @@ pub enum State {
     Running,
     BlockedStdin,
     BlockedWait,
+    BlockedPipeRead,
+    BlockedPipeWrite,
     Zombie,
 }
 

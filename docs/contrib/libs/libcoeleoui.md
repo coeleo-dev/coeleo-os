@@ -19,7 +19,9 @@ label(x, y, s)
 label_color(x, y, s, color)
 button(x, y, w, h, s) -> bool              // true on click (KIND_DOWN in the rect)
 button_fill(x, y, w, h, s, fill) -> bool   // `button` with a fill colour (use `DANGER` for wipe)
-icon_button(x, y, Icon) -> bool            // 24×24
+icon_button(x, y, Icon) -> bool            // BUTTON_H × BUTTON_H (24)
+icon_button_en(x, y, Icon, enabled) -> bool
+crumb(x, y, h, label) -> bool              // pathbar chip; layout stays in the app
 tooltip(x, y, s)
 hovering(x, y, w, h) -> bool
 key() -> Option<u8>                        // last KIND_KEY this frame (cleared in `end`)
@@ -35,7 +37,7 @@ feed(&mut self, bytes: &[u8])             // 16-byte events (kind, x, y, …)
 
 `begin` expects a `u32` pixel buffer (same layout as `win_create`). `end` returns whether there was dirty; the app then calls `win_damage`.
 
-Events in `feed`: every 16 bytes, LE `kind` in `[0..4]` (`1` = move, `2` = down, `3` = key), `x`/`y` as LE `i32`, `key` as LE `u32`. Key codes match the compositor (`KEY_ESC` = 6, `KEY_ENTER` = 4, arrows 2/3/8/9). Negative coordinates are ignored for mouse. This is what `poll_input` returns in the kernel.
+Events in `feed`: every 16 bytes, LE `kind` in `[0..4]` (`1` = move, `2` = down, `3` = key), `x`/`y` as LE `i32`, `key` as LE `u32`. Key codes match the compositor (`KEY_ESC` = 6, `KEY_ENTER` = 4, arrows 2/3/8/9, `KEY_DEL` = 10). Negative coordinates are ignored for mouse. This is what `poll_input` returns in the kernel.
 
 ## Do not
 

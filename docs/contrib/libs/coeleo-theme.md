@@ -15,12 +15,17 @@ The GUI uses the atlas in `coeleo-draw`. The VT stays Flanterm. `DECO_H` is the 
 | `GRID` | 16 | grid (VT 8×16 bitmap font height) |
 | `PANEL_H` | 32 | `GRID * 2` |
 | `DECO_H` | 32 | title bar |
+| `DECO_BTN` | 24 | min/max/close; not full `DECO_H` |
+| `DECO_BTN_PAD` | 4 | vertical inset under the focus strip |
+| `BUTTON_H` | 24 | compact push / icon button |
 | `SHADOW_PX` | 8 | shadow ring |
-| `PANEL_ALPHA` | 240 | panel alpha (~94 %) |
+| `PANEL_ALPHA` | 218 | panel alpha |
 | `PANEL_MARGIN` | 7 | floating panel margin |
+| `PANEL_INSET` | 4 | inner padding of the floating bar |
 | `PAD` | 8 | |
 | `GAP` | 8 | |
 | `RADIUS` | 6 | corners |
+| `RADIUS_SM` | 4 | pills, rows, small buttons |
 | `TASK_ICON` | 36 | |
 | `SHADOW_OFF` | 2 | |
 | `SHADOW_A` | `[40, 28, 20, 14, 10, 6, 4, 2]` | 8 alpha levels |

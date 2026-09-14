@@ -19,23 +19,24 @@ use crate::fbterm::{self, FbInfo};
 use crate::fm;
 use crate::panel;
 use crate::serial;
-use coeleo_theme::{BG, DECO_H};
+use coeleo_theme::{BG, DECO_BTN_PAD, DECO_H};
 
 use chrome::{
-    close_desk_menu, close_launcher, close_runner, confirm_key, desk_menu_activate,
-    handle_confirm_click, handle_desk_menu_click, handle_panel_click, launch_index, open_desk_menu,
-    open_runner, panel_hit, present_krunner, present_launcher, runner_enter, runner_launch,
-    runner_refresh, update_hover,
+    close_desk_menu, close_files_menu, close_launcher, close_runner, confirm_key,
+    desk_menu_activate, files_menu_activate, handle_confirm_click, handle_desk_menu_click,
+    handle_files_menu_click, handle_panel_click, launch_index, open_desk_menu, open_files_menu,
+    open_runner, panel_hit, present_files_menu, present_krunner, present_launcher, runner_enter,
+    runner_launch, runner_refresh, update_hover,
 };
-use cursor::{draw_cursor, undraw_cursor, CURSOR_H, CURSOR_W};
+use cursor::{CURSOR_H, CURSOR_W, draw_cursor, undraw_cursor};
 use damage::note;
 use frames::{
     apply_drag, apply_panel_mode, close_frame, focus_frame, hit_test, minimize_frame,
     raise_visible, retarget_focus, set_focus, sync_client_top, toggle_max,
 };
 use geom::{
-    confirm_hit, frame_new, h_work, krunner_popup, launcher_popup, launcher_row_at, launcher_sel_count,
-    opaque_rect, shadow_bounds, shadow_rect, visible_top, ConfirmHit,
+    ConfirmHit, confirm_hit, files_menu_row_at, frame_new, h_work, krunner_popup, launcher_popup,
+    launcher_row_at, launcher_sel_count, opaque_rect, shadow_bounds, shadow_rect, visible_top,
 };
 use log::{log_blit, log_cursor, log_panel, log_panel_mode};
 use paint::{
@@ -43,13 +44,13 @@ use paint::{
     paint_vt_except, present_damage,
 };
 use rect::{
-    rect_contains, rect_intersect, rect_intersects, rect_is_empty, rect_union, RECT_EMPTY, Rect,
+    RECT_EMPTY, Rect, rect_contains, rect_intersect, rect_intersects, rect_is_empty, rect_union,
 };
 use state::{
-    Drag, Focus, Frame, FrameKind, Hit, PowerHover, State, CLIENT_TOP, DAMAGE_CAP, DESK_MENU_OPEN,
-    FOCUS_DESK, FOCUS_FILES, KEY_BACK, KEY_CAP, KEY_DOWN, KEY_ENTER, KEY_ESC, KEY_HEAD, KEY_LEFT,
-    KEY_Q, KEY_RIGHT, KEY_RUNNER, KEY_TAB, KEY_TAIL, KEY_UP, LAUNCHER_OPEN, POWER_OPEN, READY,
-    RUNNER_OPEN, STATE,
+    BTN, CLIENT_TOP, DAMAGE_CAP, DESK_MENU_OPEN, Drag, FILES_MENU_OPEN, FOCUS_DESK, FOCUS_FILES,
+    Focus, Frame, FrameKind, Hit, KEY_BACK, KEY_CAP, KEY_DEL, KEY_DOWN, KEY_ENTER, KEY_ESC,
+    KEY_HEAD, KEY_LEFT, KEY_Q, KEY_RIGHT, KEY_RUNNER, KEY_TAB, KEY_TAIL, KEY_UP, LAUNCHER_OPEN,
+    POWER_OPEN, PowerHover, READY, RUNNER_OPEN, STATE, State,
 };
 
 pub enum FilesKey {
@@ -59,6 +60,7 @@ pub enum FilesKey {
     Backspace,
     Left,
     Right,
+    Delete,
 }
 
 pub fn init() {
@@ -133,6 +135,10 @@ pub fn init() {
         desk_menu_open: false,
         desk_menu_x: 0,
         desk_menu_y: 0,
+        files_menu_open: false,
+        files_menu_x: 0,
+        files_menu_y: 0,
+        files_menu_sel: 0,
         btn_held: false,
         launch_sel: 0,
         launch_list: Vec::new(),
@@ -153,6 +159,7 @@ pub fn init() {
         power_ok: false,
         power_hover: PowerHover::None,
         deco_hover: None,
+        deco_hover_pill: false,
         runner_caret: true,
         title_click_at: 0,
         title_click_kind: None,
@@ -171,11 +178,22 @@ pub fn init() {
     READY.store(true, Ordering::Release);
 }
 
-pub fn irq_tab() {
+pub fn irq_tab() -> bool {
     if RUNNER_OPEN.load(Ordering::Acquire) {
-        return;
+        return true;
     }
-    push_key(KEY_TAB);
+    if LAUNCHER_OPEN.load(Ordering::Acquire)
+        || POWER_OPEN.load(Ordering::Acquire)
+        || DESK_MENU_OPEN.load(Ordering::Acquire)
+        || FILES_MENU_OPEN.load(Ordering::Acquire)
+        || client_on_top()
+        || FOCUS_FILES.load(Ordering::Acquire)
+        || FOCUS_DESK.load(Ordering::Acquire)
+    {
+        push_key(KEY_TAB);
+        return true;
+    }
+    false
 }
 
 fn client_on_top() -> bool {
@@ -187,7 +205,9 @@ pub fn irq_esc() -> bool {
         && !RUNNER_OPEN.load(Ordering::Acquire)
         && !POWER_OPEN.load(Ordering::Acquire)
         && !DESK_MENU_OPEN.load(Ordering::Acquire)
+        && !FILES_MENU_OPEN.load(Ordering::Acquire)
         && !client_on_top()
+        && !FOCUS_FILES.load(Ordering::Acquire)
     {
         return false;
     }
@@ -244,6 +264,7 @@ pub fn irq_files_key(key: FilesKey) -> bool {
             FilesKey::Backspace => KEY_ESC,
             FilesKey::Left => KEY_LEFT,
             FilesKey::Right => KEY_RIGHT,
+            FilesKey::Delete => return true,
         };
         push_key(code);
         return true;
@@ -254,7 +275,7 @@ pub fn irq_files_key(key: FilesKey) -> bool {
             FilesKey::Down => KEY_DOWN,
             FilesKey::Enter => KEY_ENTER,
             FilesKey::Backspace => KEY_BACK,
-            FilesKey::Left | FilesKey::Right => return true,
+            FilesKey::Left | FilesKey::Right | FilesKey::Delete => return true,
         };
         push_key(code);
         return true;
@@ -265,7 +286,7 @@ pub fn irq_files_key(key: FilesKey) -> bool {
             FilesKey::Down => KEY_DOWN,
             FilesKey::Enter => KEY_ENTER,
             FilesKey::Backspace => KEY_ESC,
-            FilesKey::Left | FilesKey::Right => return true,
+            FilesKey::Left | FilesKey::Right | FilesKey::Delete => return true,
         };
         push_key(code);
         return true;
@@ -274,7 +295,20 @@ pub fn irq_files_key(key: FilesKey) -> bool {
         let code = match key {
             FilesKey::Enter => KEY_ENTER,
             FilesKey::Backspace => KEY_ESC,
-            FilesKey::Up | FilesKey::Down | FilesKey::Left | FilesKey::Right => return true,
+            FilesKey::Up | FilesKey::Down | FilesKey::Left | FilesKey::Right | FilesKey::Delete => {
+                return true;
+            }
+        };
+        push_key(code);
+        return true;
+    }
+    if FILES_MENU_OPEN.load(Ordering::Acquire) {
+        let code = match key {
+            FilesKey::Up => KEY_UP,
+            FilesKey::Down => KEY_DOWN,
+            FilesKey::Enter => KEY_ENTER,
+            FilesKey::Backspace => KEY_ESC,
+            FilesKey::Left | FilesKey::Right | FilesKey::Delete => return true,
         };
         push_key(code);
         return true;
@@ -287,6 +321,7 @@ pub fn irq_files_key(key: FilesKey) -> bool {
             FilesKey::Backspace => KEY_BACK,
             FilesKey::Left => KEY_LEFT,
             FilesKey::Right => KEY_RIGHT,
+            FilesKey::Delete => return true,
         };
         push_key(code);
         return true;
@@ -299,6 +334,7 @@ pub fn irq_files_key(key: FilesKey) -> bool {
             FilesKey::Backspace => KEY_BACK,
             FilesKey::Left => KEY_LEFT,
             FilesKey::Right => KEY_RIGHT,
+            FilesKey::Delete => return true,
         };
         push_key(code);
         return true;
@@ -312,6 +348,7 @@ pub fn irq_files_key(key: FilesKey) -> bool {
                 FilesKey::Backspace => KEY_BACK,
                 FilesKey::Left => KEY_LEFT,
                 FilesKey::Right => KEY_RIGHT,
+                FilesKey::Delete => KEY_DEL,
             };
             push_key(code);
             return true;
@@ -321,6 +358,7 @@ pub fn irq_files_key(key: FilesKey) -> bool {
             FilesKey::Down => KEY_DOWN,
             FilesKey::Enter => KEY_ENTER,
             FilesKey::Backspace => KEY_BACK,
+            FilesKey::Delete => KEY_DEL,
             FilesKey::Left | FilesKey::Right => return false,
         };
         push_key(code);
@@ -577,6 +615,14 @@ pub fn poll() {
                 }
             }
         }
+        if st.files_menu_open {
+            if let Some(row) = files_menu_row_at(st, x, y) {
+                if row != st.files_menu_sel {
+                    st.files_menu_sel = row;
+                    present_files_menu(st);
+                }
+            }
+        }
         if y < work {
             if let Some(Hit::Client(i)) = hit_test(st, x, y) {
                 match st.frames[i].kind {
@@ -617,6 +663,11 @@ pub fn poll() {
         }
         if st.desk_menu_open {
             let _ = handle_desk_menu_click(st, x, y);
+            draw_cursor(st);
+            return;
+        }
+        if st.files_menu_open {
+            let _ = handle_files_menu_click(st, x, y);
             draw_cursor(st);
             return;
         }
@@ -794,6 +845,10 @@ fn handle_right_click(st: &mut State, x: u32, y: u32, work: u32) {
     if st.power_dlg.is_some() {
         return;
     }
+    if st.files_menu_open {
+        close_files_menu(st);
+        return;
+    }
     if st.desk_menu_open {
         close_desk_menu(st);
         return;
@@ -807,6 +862,19 @@ fn handle_right_click(st: &mut State, x: u32, y: u32, work: u32) {
         return;
     }
     if y >= work {
+        return;
+    }
+    if let Some(Hit::Client(i)) = hit_test(st, x, y) {
+        if st.frames[i].kind == FrameKind::Files {
+            raise_visible(st, i);
+            set_focus(st, Focus::Files);
+            let f = st.frames[st.frames.len() - 1];
+            let lx = x.saturating_sub(f.ox);
+            let ly = y.saturating_sub(f.oy.saturating_add(DECO_H));
+            if fm::right_click_at(lx, ly, f.cw) {
+                open_files_menu(st, x, y);
+            }
+        }
         return;
     }
     if hit_test(st, x, y).is_some() {
@@ -911,6 +979,27 @@ fn apply_key(k: u8) {
         draw_cursor(st);
         return;
     }
+    if st.files_menu_open {
+        match k {
+            KEY_ESC => close_files_menu(st),
+            KEY_ENTER => files_menu_activate(st),
+            KEY_UP => {
+                if st.files_menu_sel > 0 {
+                    st.files_menu_sel -= 1;
+                    present_files_menu(st);
+                }
+            }
+            KEY_DOWN => {
+                if st.files_menu_sel + 1 < 3 {
+                    st.files_menu_sel += 1;
+                    present_files_menu(st);
+                }
+            }
+            _ => {}
+        }
+        draw_cursor(st);
+        return;
+    }
     let top_kind = visible_top(st).map(|i| st.frames[i].kind);
     let client_id = match top_kind {
         Some(FrameKind::Client(id)) => Some(id),
@@ -950,12 +1039,14 @@ fn apply_key(k: u8) {
             fm::right();
             refresh_files();
         }
-        KEY_UP | KEY_DOWN | KEY_ENTER | KEY_BACK => {
+        KEY_UP | KEY_DOWN | KEY_ENTER | KEY_BACK | KEY_ESC | KEY_DEL => {
             match k {
                 KEY_UP => fm::up(),
                 KEY_DOWN => fm::down(),
                 KEY_ENTER => fm::enter(),
                 KEY_BACK => fm::back(),
+                KEY_ESC => fm::esc(),
+                KEY_DEL => fm::delete_sel(),
                 _ => {}
             }
             refresh_files();
@@ -1136,14 +1227,37 @@ fn deco_bar(st: &State, i: usize) -> Rect {
     }
 }
 
+fn deco_pill_at(st: &State, x: u32, y: u32) -> bool {
+    let Some(h) = deco_hit(hit_test(st, x, y)) else {
+        return false;
+    };
+    let Some(i) = deco_frame(h) else {
+        return false;
+    };
+    if i >= st.frames.len() {
+        return false;
+    }
+    let f = st.frames[i];
+    let by = f.oy.saturating_add(DECO_BTN_PAD);
+    let bx = f.ox.saturating_add(f.cw);
+    let in_x = x >= bx.saturating_sub(BTN.saturating_mul(3)) && x < bx;
+    let in_y = y >= by && y < by.saturating_add(BTN);
+    in_x && in_y
+}
+
 fn files_row_rect(f: &Frame, row: usize) -> Rect {
-    let top = f.oy.saturating_add(DECO_H).saturating_add(fm::list_y0());
-    let y0 = top.saturating_add((row as u32).saturating_mul(fm::ROW_H));
-    let y1 = y0.saturating_add(fm::ROW_H);
-    let bot = f.oy.saturating_add(DECO_H).saturating_add(f.ch).saturating_sub(fm::STATUS_H);
+    let Some(rel) = fm::row_client_y(row) else {
+        return RECT_EMPTY;
+    };
+    let top = f.oy.saturating_add(DECO_H).saturating_add(rel);
+    let y1 = top.saturating_add(fm::ROW_H);
+    let bot =
+        f.oy.saturating_add(DECO_H)
+            .saturating_add(f.ch)
+            .saturating_sub(fm::STATUS_H);
     Rect {
         x0: f.ox.saturating_add(fm::list_x0()),
-        y0: y0.min(bot),
+        y0: top.min(bot),
         x1: f.ox.saturating_add(f.cw),
         y1: y1.min(bot),
     }
@@ -1154,11 +1268,10 @@ fn files_hover_rect(f: &Frame, part: fm::HoverPart) -> Rect {
         fm::HoverPart::List(row) => files_row_rect(f, row),
         fm::HoverPart::Side => {
             let y0 = f.oy.saturating_add(DECO_H).saturating_add(fm::NAV_H);
-            let y1 = f
-                .oy
-                .saturating_add(DECO_H)
-                .saturating_add(f.ch)
-                .saturating_sub(fm::STATUS_H);
+            let y1 =
+                f.oy.saturating_add(DECO_H)
+                    .saturating_add(f.ch)
+                    .saturating_sub(fm::STATUS_H);
             Rect {
                 x0: f.ox,
                 y0,
@@ -1177,11 +1290,13 @@ fn files_hover_rect(f: &Frame, part: fm::HoverPart) -> Rect {
 
 fn update_deco_hover(st: &mut State, x: u32, y: u32) {
     let nh = deco_hit(hit_test(st, x, y));
-    if nh == st.deco_hover {
+    let pill = deco_pill_at(st, x, y);
+    if nh == st.deco_hover && pill == st.deco_hover_pill {
         return;
     }
     let old = st.deco_hover;
     st.deco_hover = nh;
+    st.deco_hover_pill = pill;
     let mut r = RECT_EMPTY;
     for h in [old, nh].into_iter().flatten() {
         if let Some(i) = deco_frame(h) {
@@ -1218,6 +1333,7 @@ pub fn irq_client_char(b: u8) -> bool {
         || RUNNER_OPEN.load(Ordering::Acquire)
         || LAUNCHER_OPEN.load(Ordering::Acquire)
         || DESK_MENU_OPEN.load(Ordering::Acquire)
+        || FILES_MENU_OPEN.load(Ordering::Acquire)
     {
         return false;
     }

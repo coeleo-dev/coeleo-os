@@ -32,6 +32,8 @@ pub const SYS_REBOOT: u64 = 21;
 pub const SYS_POWEROFF: u64 = 22;
 pub const SYS_DISKS: u64 = 23;
 pub const SYS_INSTALL: u64 = 24;
+pub const SYS_PIPE: u64 = 25;
+pub const SYS_MKDIR: u64 = 26;
 
 #[repr(C)]
 pub struct CpuLocal {
@@ -98,7 +100,7 @@ extern "C" fn syscall_dispatch(num: u64, a0: u64, a1: u64, a2: u64) -> u64 {
         SYS_READ => crate::fd::sys_read(a0, a1, a2),
         SYS_CLOSE => crate::fd::sys_close(a0),
         SYS_READDIR => crate::fd::sys_readdir(a0, a1, a2),
-        SYS_SPAWN => crate::sched::sys_spawn(a0, a1),
+        SYS_SPAWN => crate::sched::sys_spawn(a0),
         SYS_WAIT => crate::sched::sys_wait(),
         SYS_KILL => crate::sched::sys_kill(a0),
         SYS_CLOCK_MS => crate::sched::sys_clock_ms(),
@@ -106,7 +108,7 @@ extern "C" fn syscall_dispatch(num: u64, a0: u64, a1: u64, a2: u64) -> u64 {
         SYS_UNLINK => crate::fd::sys_unlink(a0, a1),
         SYS_SYNC => crate::fd::sys_sync(),
         SYS_SYSINFO => crate::fd::sys_sysinfo(a0, a1, a2),
-        SYS_NET_PING => crate::net::sys_net_ping(a0, a1, a2),
+        SYS_NET_PING => crate::net::sys_net_ping(a0),
         SYS_HTTP_GET => crate::net::sys_http_get(a0),
         SYS_WIN_CREATE => crate::win::sys_create(a0, a1, a2),
         SYS_WIN_DAMAGE => crate::win::sys_damage(a0, a1, a2),
@@ -116,6 +118,8 @@ extern "C" fn syscall_dispatch(num: u64, a0: u64, a1: u64, a2: u64) -> u64 {
         SYS_POWEROFF => crate::acpi::sys_poweroff(),
         SYS_DISKS => crate::blk::sys_disks(a0, a1),
         SYS_INSTALL => crate::install::sys_install(a0),
+        SYS_PIPE => crate::fd::sys_pipe(a0),
+        SYS_MKDIR => crate::fd::sys_mkdir(a0, a1),
         _ => u64::MAX,
     }
 }

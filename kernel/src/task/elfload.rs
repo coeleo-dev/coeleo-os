@@ -169,3 +169,78 @@ fn copy_into_frame(frame: PhysFrame<Size4KiB>, off: usize, src: &[u8]) {
         core::ptr::copy_nonoverlapping(src.as_ptr(), virt.as_mut_ptr::<u8>().add(off), src.len());
     }
 }
+
+pub const ARGV_MAX: usize = 16;
+pub const ARGV_STR_MAX: usize = 255;
+
+pub struct ArgvSetup {
+    pub rsp: u64,
+    pub argc: u64,
+    pub argv_ptr: u64,
+}
+
+/// Write SysV `argc`/`argv` onto the image stack via its frames (parent CR3).
+pub fn write_argv(image: &Image, strings: &[&str]) -> Result<ArgvSetup, ()> {
+    if strings.is_empty() || strings.len() > ARGV_MAX {
+        return Err(());
+    }
+    for s in strings {
+        if s.is_empty() || s.len() > ARGV_STR_MAX {
+            return Err(());
+        }
+    }
+    let mut cursor = USER_STACK_TOP;
+    let mut str_va = [0u64; ARGV_MAX];
+    for (i, s) in strings.iter().enumerate() {
+        let n = s.len() + 1;
+        cursor = cursor.checked_sub(n as u64).ok_or(())?;
+        let mut tmp = [0u8; ARGV_STR_MAX + 1];
+        tmp[..s.len()].copy_from_slice(s.as_bytes());
+        write_user(image, cursor, &tmp[..n])?;
+        str_va[i] = cursor;
+    }
+    let argc = strings.len() as u64;
+    let table = 8 + (strings.len() + 2) * 8;
+    let mut rsp = cursor.checked_sub(table as u64).ok_or(())?;
+    rsp &= !0xF;
+    if rsp.checked_add(table as u64).ok_or(())? > cursor {
+        return Err(());
+    }
+    write_user(image, rsp, &argc.to_le_bytes())?;
+    let argv_ptr = rsp + 8;
+    for i in 0..strings.len() {
+        write_user(image, argv_ptr + (i as u64) * 8, &str_va[i].to_le_bytes())?;
+    }
+    let nil = 0u64.to_le_bytes();
+    write_user(image, argv_ptr + (strings.len() as u64) * 8, &nil)?;
+    write_user(image, argv_ptr + (strings.len() as u64 + 1) * 8, &nil)?;
+    Ok(ArgvSetup {
+        rsp,
+        argc,
+        argv_ptr,
+    })
+}
+
+fn write_user(image: &Image, va: u64, src: &[u8]) -> Result<(), ()> {
+    let mut remaining = src;
+    let mut addr = va;
+    while !remaining.is_empty() {
+        let page = addr & !(pmm::FRAME_SIZE - 1);
+        let off = (addr - page) as usize;
+        let frame = frame_at(image, page).ok_or(())?;
+        let n = remaining.len().min(pmm::FRAME_SIZE as usize - off);
+        copy_into_frame(frame, off, &remaining[..n]);
+        remaining = &remaining[n..];
+        addr += n as u64;
+    }
+    Ok(())
+}
+
+fn frame_at(image: &Image, page: u64) -> Option<PhysFrame<Size4KiB>> {
+    for &(virt, frame) in &image.pages {
+        if virt.as_u64() == page {
+            return Some(frame);
+        }
+    }
+    None
+}

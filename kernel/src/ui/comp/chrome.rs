@@ -12,14 +12,15 @@ use super::frames::{
     close_frame, ensure_frame, focus_frame, minimize_frame, raise, raise_visible, restore_min,
 };
 use super::geom::{
-    confirm_hit, desk_menu_popup, desk_menu_row_at, desk_menu_shadow, krunner_shadow,
-    launcher_shadow, shadow_rect, task_frame, task_infos, visible_top, work_rect, ConfirmHit,
-    LAUNCH_NAMES,
+    ConfirmHit, LAUNCH_NAMES, confirm_hit, desk_menu_popup, desk_menu_row_at, desk_menu_shadow,
+    files_menu_popup, files_menu_row_at, files_menu_shadow, krunner_shadow, launcher_shadow,
+    shadow_rect, task_frame, task_infos, visible_top, work_rect,
 };
 use super::paint::{fill_rect_r, paint_strut, present_damage};
-use super::rect::{rect_contains, rect_union, Rect};
+use super::rect::{Rect, rect_contains, rect_union};
 use super::state::{
-    DESK_MENU_OPEN, LAUNCHER_OPEN, POWER_OPEN, RUNNER_OPEN, FrameKind, PowerKind, State,
+    DESK_MENU_OPEN, FILES_MENU_OPEN, FrameKind, LAUNCHER_OPEN, POWER_OPEN, PowerKind, RUNNER_OPEN,
+    State,
 };
 
 pub(super) fn clock_now<'a>(buf: &'a mut [u8; 16]) -> &'a str {
@@ -221,6 +222,7 @@ pub(super) fn present_krunner(st: &mut State) {
 }
 
 pub(super) fn open_desk_menu(st: &mut State, x: u32, y: u32) {
+    close_files_menu(st);
     close_launcher(st);
     close_runner(st);
     st.desk_menu_x = x;
@@ -244,6 +246,67 @@ pub(super) fn close_desk_menu(st: &mut State) {
 
 pub(super) fn present_desk_menu(st: &mut State) {
     present_damage(st, desk_menu_shadow(st), false);
+}
+
+pub(super) fn open_files_menu(st: &mut State, x: u32, y: u32) {
+    close_desk_menu(st);
+    close_launcher(st);
+    close_runner(st);
+    st.files_menu_x = x;
+    st.files_menu_y = y;
+    st.files_menu_sel = 0;
+    st.files_menu_open = true;
+    FILES_MENU_OPEN.store(true, Ordering::Release);
+    present_files_menu(st);
+}
+
+pub(super) fn close_files_menu(st: &mut State) {
+    if !st.files_menu_open {
+        return;
+    }
+    let r = files_menu_shadow(st);
+    st.files_menu_open = false;
+    FILES_MENU_OPEN.store(false, Ordering::Release);
+    fill_rect_r(st, r);
+    present_damage(st, r, false);
+}
+
+pub(super) fn present_files_menu(st: &mut State) {
+    present_damage(st, files_menu_shadow(st), false);
+}
+
+pub(super) fn files_menu_activate(st: &mut State) {
+    let flags = crate::fm::menu_flags();
+    let row = st.files_menu_sel;
+    close_files_menu(st);
+    match row {
+        0 if flags.can_open => crate::fm::menu_open(),
+        1 if flags.can_up => crate::fm::menu_go_up(),
+        2 if flags.can_delete => crate::fm::delete_sel(),
+        _ => {}
+    }
+    if let Some(f) = st
+        .frames
+        .iter()
+        .find(|f| f.kind == FrameKind::Files && !f.minimized)
+    {
+        present_damage(st, shadow_rect(f), false);
+    }
+}
+
+pub(super) fn handle_files_menu_click(st: &mut State, x: u32, y: u32) -> bool {
+    if !st.files_menu_open {
+        return false;
+    }
+    if let Some(i) = files_menu_row_at(st, x, y) {
+        st.files_menu_sel = i;
+        files_menu_activate(st);
+        return true;
+    }
+    if !rect_contains(files_menu_popup(st), x, y) {
+        close_files_menu(st);
+    }
+    true
 }
 
 pub(super) fn desk_menu_activate(st: &mut State) {

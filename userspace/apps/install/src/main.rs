@@ -2,11 +2,10 @@
 #![no_main]
 #![allow(static_mut_refs)]
 
-use coeleo_theme::{ACCENT, DIM, HIGHLIGHT, PAD, SURFACE, TEXT};
+use coeleo_theme::{ACCENT, BUTTON_H, DIM, HIGHLIGHT, PAD, SURFACE, TEXT};
 use libcoeleo::{
     DISK_FLAG_LIVE, DISK_FLAG_SMALL, DISK_KIND_AHCI, DISK_KIND_USB, DISK_KIND_VIRTIO, ERR, disks,
-    install, reboot,
-    sync, write,
+    install, reboot, sync, write,
 };
 use libcoeleoui::{KEY_DOWN, KEY_ENTER, KEY_ESC, KEY_LEFT, KEY_RIGHT, KEY_UP, ROW};
 
@@ -14,7 +13,7 @@ const W: u32 = 256;
 const H: u32 = 240;
 const NPX: usize = 256 * 240;
 const FOOT_Y: u32 = 204;
-const BTN_H: u32 = 28;
+const BTN_H: u32 = BUTTON_H;
 const BTN_W: u32 = 116;
 const CARD_X: u32 = 12;
 const CARD_Y: u32 = 48;

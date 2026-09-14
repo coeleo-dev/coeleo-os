@@ -6,9 +6,9 @@ use alloc::vec::Vec;
 use crate::fm;
 use crate::fs;
 use crate::panel;
-use coeleo_theme::{ACCENT, BG, DIM, GAP, HIGHLIGHT, PAD, SURFACE, TEXT};
+use coeleo_theme::{ACCENT, BG, DIM, GAP, HIGHLIGHT, PAD, RADIUS_SM, SURFACE, TEXT};
 
-const BTN_H: u32 = 24;
+const BTN_H: u32 = coeleo_theme::BUTTON_H;
 const ROW_H: u32 = coeleo_draw::FONT_H + GAP;
 
 #[derive(Clone)]
@@ -102,18 +102,28 @@ pub fn render(w: u32, h: u32, d: &mut impl fm::Draw) {
     let bw = w.saturating_sub(PAD * 3) / 2;
     let float_on = panel::mode() == panel::Mode::Float;
     if float_on {
-        d.fill(PAD, y, bw, BTN_H, HIGHLIGHT);
+        d.fill_round(PAD, y, bw, BTN_H, RADIUS_SM, HIGHLIGHT);
     } else {
-        d.fill(PAD, y, bw, BTN_H, SURFACE);
+        d.fill_round(PAD, y, bw, BTN_H, RADIUS_SM, SURFACE);
     }
-    d.text(PAD + GAP, y + (BTN_H.saturating_sub(coeleo_draw::FONT_H)) / 2, "Float", TEXT);
+    d.text(
+        PAD + GAP,
+        y + (BTN_H.saturating_sub(coeleo_draw::FONT_H)) / 2,
+        "Float",
+        TEXT,
+    );
     let x1 = PAD * 2 + bw;
     if !float_on {
-        d.fill(x1, y, bw, BTN_H, HIGHLIGHT);
+        d.fill_round(x1, y, bw, BTN_H, RADIUS_SM, HIGHLIGHT);
     } else {
-        d.fill(x1, y, bw, BTN_H, SURFACE);
+        d.fill_round(x1, y, bw, BTN_H, RADIUS_SM, SURFACE);
     }
-    d.text(x1 + GAP, y + (BTN_H.saturating_sub(coeleo_draw::FONT_H)) / 2, "Full", TEXT);
+    d.text(
+        x1 + GAP,
+        y + (BTN_H.saturating_sub(coeleo_draw::FONT_H)) / 2,
+        "Full",
+        TEXT,
+    );
     y += BTN_H + PAD;
     d.text(PAD, y, "Wallpaper", TEXT);
     y += ROW_H;
@@ -122,9 +132,21 @@ pub fn render(w: u32, h: u32, d: &mut impl fm::Draw) {
             break;
         }
         if i == s.wall_sel {
-            d.fill(PAD, y, w.saturating_sub(PAD * 2), ROW_H, HIGHLIGHT);
+            d.fill_round(
+                PAD,
+                y,
+                w.saturating_sub(PAD * 2),
+                ROW_H,
+                RADIUS_SM,
+                HIGHLIGHT,
+            );
         }
-        d.text(PAD + GAP, y + (ROW_H.saturating_sub(coeleo_draw::FONT_H)) / 2, label(item), TEXT);
+        d.text(
+            PAD + GAP,
+            y + (ROW_H.saturating_sub(coeleo_draw::FONT_H)) / 2,
+            label(item),
+            TEXT,
+        );
         y += ROW_H;
     }
     let _ = (ACCENT, DIM);

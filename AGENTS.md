@@ -2,7 +2,7 @@
 
 ## This repository
 
-Coeleo OS. The normative spec is [`docs/requirements/coeleo-os-specification-v02.md`](docs/requirements/coeleo-os-specification-v02.md). Setup, architecture, and lib sheets: [`docs/contrib/`](docs/contrib/). After phases 1–15 (R15): [`docs/roadmap-pos-fase-15.md`](docs/roadmap-pos-fase-15.md). Phase 16 is closed. Full index 16–49: [`implementation-plan-full.md`](docs/requirements/implementation-plan-full.md). Next to implement: [`phase-17.1-disk-table.md`](docs/requirements/demands/PHASE-17/phase-17.1-disk-table.md) (product: [`phase-17-installer.md`](docs/requirements/demands/PHASE-17/phase-17-installer.md); pendrive = [17.4](docs/requirements/demands/PHASE-17/phase-17.4-usb-msc.md)).
+Coeleo OS.
 
 Kernel code: `kernel/`. Userspace: `userspace/libs/` (shared crates) and `userspace/apps/` (ELFs).
 

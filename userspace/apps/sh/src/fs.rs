@@ -1,9 +1,9 @@
 use libcoeleo::{
-    ERR, OPEN_CREATE, OPEN_READ, OPEN_TRUNC, OPEN_WRITE, close, dirent_is_dir, dirent_name, open,
-    read, readdir, sync, unlink, write,
+    ERR, OPEN_CREATE, OPEN_READ, OPEN_TRUNC, OPEN_WRITE, close, dirent_is_dir, dirent_name, mkdir,
+    open, read, readdir, sync, unlink, write,
 };
 
-use crate::cwd::{resolve, Cwd};
+use crate::cwd::{Cwd, resolve};
 
 const WRITE_PROMPT: &[u8] = b"write>";
 const WRITE_CAP: usize = 4096;
@@ -195,4 +195,103 @@ pub fn cmd_cd(cwd: &mut Cwd, args: &str) {
         return;
     }
     cwd.set(path);
+}
+
+pub fn cmd_pwd(cwd: &Cwd) {
+    let _ = write(1, cwd.as_str().as_bytes());
+    let _ = write(1, b"\n");
+}
+
+pub fn cmd_mkdir(cwd: &Cwd, args: &str) {
+    let path_arg = args.split_whitespace().next().unwrap_or("");
+    if path_arg.is_empty() {
+        let _ = write(1, b"mkdir: missing path\n");
+        return;
+    }
+    let mut abs = [0u8; 256];
+    let path = resolve(cwd.as_str(), path_arg, &mut abs);
+    if mkdir(path) == ERR {
+        let _ = write(1, b"mkdir: failed\n");
+    }
+}
+
+pub fn cmd_cp(cwd: &Cwd, args: &str) {
+    let mut it = args.split_whitespace();
+    let src_arg = it.next().unwrap_or("");
+    let dst_arg = it.next().unwrap_or("");
+    if src_arg.is_empty() || dst_arg.is_empty() {
+        let _ = write(1, b"cp: missing path\n");
+        return;
+    }
+    let mut src_abs = [0u8; 256];
+    let mut dst_abs = [0u8; 256];
+    let src = resolve(cwd.as_str(), src_arg, &mut src_abs);
+    let dst = resolve(cwd.as_str(), dst_arg, &mut dst_abs);
+    if copy_file(src, dst).is_err() {
+        let _ = write(1, b"cp: failed\n");
+    }
+}
+
+pub fn cmd_mv(cwd: &Cwd, args: &str) {
+    let mut it = args.split_whitespace();
+    let src_arg = it.next().unwrap_or("");
+    let dst_arg = it.next().unwrap_or("");
+    if src_arg.is_empty() || dst_arg.is_empty() {
+        let _ = write(1, b"mv: missing path\n");
+        return;
+    }
+    let mut src_abs = [0u8; 256];
+    let mut dst_abs = [0u8; 256];
+    let src = resolve(cwd.as_str(), src_arg, &mut src_abs);
+    let dst = resolve(cwd.as_str(), dst_arg, &mut dst_abs);
+    if copy_file(src, dst).is_err() {
+        let _ = write(1, b"mv: failed\n");
+        return;
+    }
+    if unlink(src) == ERR {
+        let _ = write(1, b"mv: failed\n");
+    }
+}
+
+fn copy_file(src: &str, dst: &str) -> Result<(), ()> {
+    let in_fd = open(src, OPEN_READ);
+    if in_fd == ERR {
+        return Err(());
+    }
+    let mut probe = [0u8; 64];
+    if readdir(in_fd, &mut probe) != ERR {
+        let _ = close(in_fd);
+        return Err(());
+    }
+    let out_fd = open(dst, OPEN_CREATE | OPEN_WRITE | OPEN_TRUNC);
+    if out_fd == ERR {
+        let _ = close(in_fd);
+        return Err(());
+    }
+    loop {
+        let mut buf = [0u8; 512];
+        let r = read(in_fd, &mut buf);
+        if r == 0 {
+            break;
+        }
+        if r == ERR {
+            let _ = close(in_fd);
+            let _ = close(out_fd);
+            return Err(());
+        }
+        let n = r as usize;
+        let mut off = 0usize;
+        while off < n {
+            let w = write(out_fd, &buf[off..n]);
+            if w == ERR {
+                let _ = close(in_fd);
+                let _ = close(out_fd);
+                return Err(());
+            }
+            off += w as usize;
+        }
+    }
+    let _ = close(in_fd);
+    let _ = close(out_fd);
+    Ok(())
 }

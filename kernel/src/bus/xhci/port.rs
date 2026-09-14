@@ -22,11 +22,7 @@ pub(super) fn reset_port(hc: &mut Host, p: u8) -> bool {
             return false;
         }
     }
-    write_port(
-        hc,
-        p,
-        port_neutral(read_port(hc, p)) | PORT_PRC | PORT_CSC,
-    );
+    write_port(hc, p, port_neutral(read_port(hc, p)) | PORT_PRC | PORT_CSC);
     wait_port(hc, p, PORT_PED, PORT_PED)
 }
 

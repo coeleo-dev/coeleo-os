@@ -38,6 +38,8 @@ Syscalls (`u64`):
 | `SYS_POWEROFF` | 22 |
 | `SYS_DISKS` | 23 |
 | `SYS_INSTALL` | 24 |
+| `SYS_PIPE` | 25 |
+| `SYS_MKDIR` | 26 |
 
 Flags / codes:
 
@@ -46,6 +48,7 @@ Flags / codes:
 - `DISK_KIND_VIRTIO` = 0, `DISK_KIND_AHCI` = 1, `DISK_KIND_USB` = 2. `DISK_FLAG_LIVE` = 1, `DISK_FLAG_SMALL` = 2.
 - `DIRENT_SIZE` = 64.
 - `ERR` = `u64::MAX`; `ERR_NO_NET`, `ERR_TIMEOUT`, `ERR_HTTPS`, `ERR_BAD_URL` = `MAX-1` … `MAX-4`.
+- `SPAWN_FD_DEFAULT` = `u64::MAX` (keep the child’s usual stdin/stdout).
 
 ## Functions
 
@@ -58,11 +61,14 @@ read(fd, buf) -> u64
 close(fd) -> u64
 readdir(fd, buf: &mut [u8; DIRENT_SIZE]) -> u64
 spawn(path) -> u64
+spawn_ex(path, argv, stdin_fd, stdout_fd) -> u64
+pipe(fds: &mut [u32; 2]) -> u64
 wait() -> u64
 kill(pid) -> u64
 clock_ms() -> u64
 ps(buf) -> u64
 unlink(path) -> u64
+mkdir(path) -> u64
 sync() -> u64
 sysinfo(kind, buf) -> u64
 date(buf) -> u64
@@ -70,7 +76,7 @@ reboot() -> u64
 poweroff() -> u64
 disks(buf) -> u64
 install(index) -> u64
-net_ping(octets: [u8; 4], buf) -> u64
+net_ping(name, buf) -> u64
 http_get(url, buf) -> u64
 win_create(w, h, pixels: &[u32]) -> u64
 win_damage(id, x, y, w, h) -> u64
@@ -80,7 +86,7 @@ dirent_name(buf) -> &str
 exit(code) -> !
 ```
 
-`syscall` in `rax` / `rdi` / `rsi` / `rdx`. `http_get` passes a private `HttpGetArgs` struct in `rdi`.
+`syscall` in `rax` / `rdi` / `rsi` / `rdx`. `http_get`, `net_ping`, and `spawn`/`spawn_ex` each pass a private args struct in `rdi`. `spawn` is argv-empty and default fds; the argv blob is NUL-separated (`hello\0world\0`). `pipe` writes `{read, write}` as two little-endian `u32` into 8 bytes.
 
 `disks` copies into the caller buffer (use `[u8; 256]`): LE `u32` count, `u32` pad, then `count` rows of 24 bytes (`index`, `kind`, `flags`, reserved, `sectors` as `u64`). `kind`: 0 virtio, 1 AHCI. `flags` bit0 live-root, bit1 too small. Returns byte count or `ERR`. `install(n)`: first valid call returns `1` (armed); the second with the same `n` runs the kernel engine and returns `0` or `ERR`.
 

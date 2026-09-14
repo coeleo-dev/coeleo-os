@@ -6,14 +6,19 @@
 pub mod font;
 
 use coeleo_theme::{
-    BG, DANGER, DIM, GAP, HIGHLIGHT, HOVER, OVERLAY, OVERLAY_ALPHA, PAD, RADIUS_SM, SHADOW, SURFACE,
-    TEXT,
+    ACCENT, BG, BUTTON_H, DANGER, DIM, GAP, HIGHLIGHT, HOVER, OVERLAY, OVERLAY_ALPHA, PAD,
+    RADIUS_SM, SHADOW, SURFACE, TEXT,
 };
 
+/// Glyph cell width (blit). Prefer [`text_width`] for layout.
 pub const FONT_W: u32 = font::WIDTH;
 pub const FONT_H: u32 = font::HEIGHT;
 pub const ICON: u32 = 16;
 pub const ROW: u32 = FONT_H + GAP;
+
+pub fn text_width(s: &str) -> u32 {
+    s.bytes().map(font::advance).fold(0u32, u32::saturating_add)
+}
 
 const SDF_S: i32 = 8;
 
@@ -57,6 +62,9 @@ pub enum Icon {
     Close,
     Back,
     Forward,
+    Up,
+    Min,
+    Max,
 }
 
 pub fn put(t: Target, x: u32, y: u32, color: u32) {
@@ -317,19 +325,28 @@ pub fn scrim(t: Target, x: u32, y: u32, w: u32, h: u32, clip: Clip) {
 
 pub fn text_elide(t: Target, x: u32, y: u32, s: &str, color: u32, xmax: u32, clip: Clip) {
     let avail = xmax.saturating_sub(x);
-    let max_chars = avail / FONT_W;
-    let n = s.len() as u32;
-    if n <= max_chars {
+    if text_width(s) <= avail {
         text(t, x, y, s, color, xmax, clip);
         return;
     }
-    if max_chars < 4 {
-        text(t, x, y, s, color, xmax, clip);
+    let dots = text_width("...");
+    if avail <= dots {
+        text(t, x, y, "...", color, xmax, clip);
         return;
     }
-    let keep = (max_chars as usize).saturating_sub(3).min(s.len());
+    let budget = avail.saturating_sub(dots);
+    let mut w = 0u32;
+    let mut n = 0usize;
+    for c in s.bytes() {
+        let a = font::advance(c);
+        if w.saturating_add(a) > budget {
+            break;
+        }
+        w = w.saturating_add(a);
+        n += 1;
+    }
     let mut buf = [0u8; 96];
-    let nkeep = keep.min(buf.len().saturating_sub(3));
+    let nkeep = n.min(buf.len().saturating_sub(3)).min(s.len());
     buf[..nkeep].copy_from_slice(&s.as_bytes()[..nkeep]);
     buf[nkeep] = b'.';
     buf[nkeep + 1] = b'.';
@@ -350,7 +367,21 @@ pub fn query_field(
     search_icon: bool,
     clip: Clip,
 ) {
-    fill_round(t, x, y, w, h, RADIUS_SM, BG, clip);
+    if show_caret {
+        fill_round(t, x, y, w, h, RADIUS_SM, ACCENT, clip);
+        fill_round(
+            t,
+            x.saturating_add(1),
+            y.saturating_add(1),
+            w.saturating_sub(2),
+            h.saturating_sub(2),
+            RADIUS_SM,
+            BG,
+            clip,
+        );
+    } else {
+        fill_round(t, x, y, w, h, RADIUS_SM, BG, clip);
+    }
     let mut tx = x.saturating_add(PAD / 2);
     if search_icon {
         icon(
@@ -375,7 +406,7 @@ pub fn query_field(
     text_elide(t, tx, ty, text_s, TEXT, xmax, clip);
     if show_caret {
         let cx = tx
-            .saturating_add((text_s.len() as u32).saturating_mul(FONT_W))
+            .saturating_add(text_width(text_s))
             .min(xmax.saturating_sub(1));
         caret(t, cx, ty, FONT_H, clip);
     }
@@ -393,19 +424,98 @@ pub fn list_row(
     hovered: bool,
     clip: Clip,
 ) {
+    list_row_fg(
+        t, x, y, w, h, label, icon_which, selected, hovered, TEXT, clip,
+    );
+}
+
+pub fn list_row_fg(
+    t: Target,
+    x: u32,
+    y: u32,
+    w: u32,
+    h: u32,
+    label: &str,
+    icon_which: Option<Icon>,
+    selected: bool,
+    hovered: bool,
+    color: u32,
+    clip: Clip,
+) {
+    let fx = x.saturating_add(2);
+    let fy = y.saturating_add(1);
+    let fw = w.saturating_sub(4);
+    let fh = h.saturating_sub(2);
     if selected {
-        highlight_fill(t, x, y, w, h, clip);
+        highlight_fill(t, fx, fy, fw, fh, clip);
     } else if hovered {
-        hover_fill(t, x, y, w, h, clip);
+        hover_fill(t, fx, fy, fw, fh, clip);
     }
     let mut tx = x.saturating_add(PAD / 2);
     let iy = y + (h.saturating_sub(ICON)) / 2;
     if let Some(ic) = icon_which {
-        icon(t, ic, tx, iy, TEXT, clip);
+        icon(t, ic, tx, iy, color, clip);
         tx = tx.saturating_add(ICON + PAD / 2);
     }
     let ty = y.saturating_add(h.saturating_sub(FONT_H) / 2);
-    text_elide(t, tx, ty, label, TEXT, x.saturating_add(w), clip);
+    text_elide(t, tx, ty, label, color, x.saturating_add(w), clip);
+}
+
+pub fn icon_btn(
+    t: Target,
+    x: u32,
+    y: u32,
+    which: Icon,
+    hovered: bool,
+    pressed: bool,
+    enabled: bool,
+    idle_fill: Option<u32>,
+    clip: Clip,
+) {
+    let w = BUTTON_H;
+    let h = BUTTON_H;
+    if enabled {
+        if pressed {
+            highlight_fill(t, x, y, w, h, clip);
+        } else if hovered {
+            hover_fill(t, x, y, w, h, clip);
+        } else if let Some(fill) = idle_fill {
+            fill_round(t, x, y, w, h, RADIUS_SM, fill, clip);
+        }
+    } else if let Some(fill) = idle_fill {
+        fill_round(t, x, y, w, h, RADIUS_SM, fill, clip);
+    }
+    let color = if enabled { TEXT } else { DIM };
+    icon(
+        t,
+        which,
+        x.saturating_add(4),
+        y.saturating_add(4),
+        color,
+        clip,
+    );
+}
+
+pub fn crumb_width(label: &str) -> u32 {
+    text_width(label).saturating_add(PAD)
+}
+
+pub fn crumb(t: Target, x: u32, y: u32, h: u32, label: &str, hovered: bool, clip: Clip) -> u32 {
+    let w = crumb_width(label);
+    if hovered {
+        hover_fill(t, x, y, w, h, clip);
+    }
+    let ty = y.saturating_add(h.saturating_sub(FONT_H) / 2);
+    let tx = x.saturating_add(PAD / 2);
+    text(t, tx, ty, label, TEXT, x.saturating_add(w), clip);
+    w
+}
+
+pub fn crumb_sep(t: Target, x: u32, y: u32, h: u32, clip: Clip) -> u32 {
+    let w = text_width(">").saturating_add(GAP / 2);
+    let ty = y.saturating_add(h.saturating_sub(FONT_H) / 2);
+    text(t, x, ty, ">", DIM, x.saturating_add(w), clip);
+    w
 }
 
 pub fn blend(dst: u32, src: u32, a: u8) -> u32 {
@@ -434,24 +544,21 @@ pub fn text_bold(t: Target, x: u32, y: u32, s: &str, color: u32, xmax: u32, clip
     text_cov(t, x, y, s, color, xmax, clip, true);
 }
 
-fn text_cov(t: Target, x: u32, y: u32, s: &str, color: u32, xmax: u32, clip: Clip, bold: bool) {
+fn text_cov(t: Target, x: u32, y: u32, s: &str, color: u32, xmax: u32, clip: Clip, _bold: bool) {
     let mut cx = x;
     for c in s.bytes() {
-        if cx.saturating_add(FONT_W) > xmax {
+        if cx >= xmax {
             break;
         }
         for gy in 0..FONT_H {
             for gx in 0..FONT_W {
-                let mut cov = font::coverage(c, gx, gy);
-                if bold {
-                    cov = cov.saturating_add(cov / 2);
-                }
+                let cov = font::coverage(c, gx, gy);
                 if cov == 0 {
                     continue;
                 }
                 let px = cx.saturating_add(gx);
                 let py = y.saturating_add(gy);
-                if !clip.contains(px, py) {
+                if px >= xmax || !clip.contains(px, py) {
                     continue;
                 }
                 if cov == 255 {
@@ -461,14 +568,17 @@ fn text_cov(t: Target, x: u32, y: u32, s: &str, color: u32, xmax: u32, clip: Cli
                 }
             }
         }
-        cx = cx.saturating_add(FONT_W);
+        cx = cx.saturating_add(font::advance(c));
     }
 }
 
 pub fn tooltip_size(s: &str, with_close: bool) -> (u32, u32) {
-    let extra = if with_close { 18 } else { 0 };
-    let w = (s.len() as u32)
-        .saturating_mul(FONT_W)
+    let extra = if with_close {
+        ICON.saturating_add(PAD)
+    } else {
+        0
+    };
+    let w = text_width(s)
         .saturating_add(PAD)
         .saturating_add(PAD / 2)
         .saturating_add(extra);
@@ -488,8 +598,8 @@ pub fn tooltip(t: Target, x: u32, y: u32, s: &str, with_close: bool, clip: Clip)
         clip,
     );
     if with_close {
-        let cx = x.saturating_add(w).saturating_sub(14);
-        let cy = y.saturating_add(PAD / 2);
+        let cx = x.saturating_add(w).saturating_sub(ICON + 2);
+        let cy = y + (h.saturating_sub(ICON)) / 2;
         icon(t, Icon::Close, cx, cy, coeleo_theme::DANGER, clip);
         return Clip {
             x0: cx,
@@ -538,6 +648,9 @@ pub fn icon(t: Target, which: Icon, x: u32, y: u32, color: u32, clip: Clip) {
         Icon::Close => icon_close(t, x, y, color, clip),
         Icon::Back => icon_chev(t, x, y, color, clip, true),
         Icon::Forward => icon_chev(t, x, y, color, clip, false),
+        Icon::Up => icon_up(t, x, y, color, clip),
+        Icon::Min => icon_min(t, x, y, color, clip),
+        Icon::Max => icon_max(t, x, y, color, clip, false),
     }
 }
 
@@ -604,20 +717,75 @@ fn icon_app(t: Target, x: u32, y: u32, c: u32, clip: Clip) {
 }
 
 fn icon_close(t: Target, x: u32, y: u32, c: u32, clip: Clip) {
-    for i in 0..10u32 {
-        plot(t, x + 3 + i, y + 3 + i, c, 220, clip);
-        plot(t, x + 4 + i, y + 3 + i, c, 140, clip);
-        plot(t, x + 12 - i, y + 3 + i, c, 220, clip);
-        plot(t, x + 11 - i, y + 3 + i, c, 140, clip);
+    line_aa(t, x + 4, y + 4, x + 11, y + 11, c, clip);
+    line_aa(t, x + 11, y + 4, x + 4, y + 11, c, clip);
+}
+
+fn icon_min(t: Target, x: u32, y: u32, c: u32, clip: Clip) {
+    line_aa(t, x + 3, y + 11, x + 12, y + 11, c, clip);
+}
+
+fn icon_max(t: Target, x: u32, y: u32, c: u32, clip: Clip, restore: bool) {
+    if restore {
+        stroke_round(t, x + 5, y + 3, 8, 8, 1, c, clip);
+        stroke_round(t, x + 3, y + 5, 8, 8, 1, c, clip);
+        return;
+    }
+    stroke_round(t, x + 3, y + 3, 10, 10, 1, c, clip);
+}
+
+fn stroke_round(t: Target, x: u32, y: u32, w: u32, h: u32, radius: u32, c: u32, clip: Clip) {
+    for row in 0..h {
+        for col in 0..w {
+            let cov = coverage_round(x + col, y + row, x, y, w, h, radius);
+            let inner = if w > 2 && h > 2 {
+                coverage_round(x + col, y + row, x + 1, y + 1, w - 2, h - 2, radius)
+            } else {
+                0
+            };
+            let a = cov.saturating_sub(inner);
+            plot(t, x + col, y + row, c, a, clip);
+        }
     }
 }
 
 fn icon_chev(t: Target, x: u32, y: u32, c: u32, clip: Clip, left: bool) {
-    for i in 0..6u32 {
-        let ox = if left { 9 - i / 2 } else { 6 + i / 2 };
-        plot(t, x + ox, y + 5 + i, c, 220, clip);
-        plot(t, x + ox + 1, y + 5 + i, c, 180, clip);
+    if left {
+        line_aa(t, x + 10, y + 4, x + 5, y + 8, c, clip);
+        line_aa(t, x + 5, y + 8, x + 10, y + 12, c, clip);
+    } else {
+        line_aa(t, x + 5, y + 4, x + 10, y + 8, c, clip);
+        line_aa(t, x + 10, y + 8, x + 5, y + 12, c, clip);
     }
+}
+
+fn icon_up(t: Target, x: u32, y: u32, c: u32, clip: Clip) {
+    line_aa(t, x + 4, y + 10, x + 8, y + 5, c, clip);
+    line_aa(t, x + 8, y + 5, x + 12, y + 10, c, clip);
+}
+
+fn line_aa(t: Target, x0: u32, y0: u32, x1: u32, y1: u32, c: u32, clip: Clip) {
+    let dx = x1 as i32 - x0 as i32;
+    let dy = y1 as i32 - y0 as i32;
+    let n = dx.abs().max(dy.abs()).max(1);
+    for i in 0..=n {
+        let x = x0 as i32 + dx * i / n;
+        let y = y0 as i32 + dy * i / n;
+        if x < 0 || y < 0 {
+            continue;
+        }
+        plot(t, x as u32, y as u32, c, 220, clip);
+        plot(t, x as u32 + 1, y as u32, c, 90, clip);
+        if y as u32 > 0 {
+            plot(t, x as u32, y as u32 - 1, c, 70, clip);
+        }
+        plot(t, x as u32, y as u32 + 1, c, 70, clip);
+    }
+}
+
+/// Restore-max glyph (two overlapping frames).
+pub fn icon_restore(t: Target, x: u32, y: u32, color: u32, clip: Clip) {
+    icon_max(t, x, y, color, clip, true);
 }
 
 pub fn btn_shadow(t: Target, x: u32, y: u32, w: u32, h: u32, clip: Clip) {

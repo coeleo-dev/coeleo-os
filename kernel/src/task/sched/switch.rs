@@ -12,8 +12,8 @@ use crate::process::Outcome;
 use crate::syscall::CPU_LOCAL;
 
 use super::pcb::{
-    FxBuf, IrqFrame, KernelCont, KernelStack, Pcb, Sched, State, TrapFrame, KSTACK_SIZE, MAX_PROC,
-    SCHED,
+    FxBuf, IrqFrame, KSTACK_SIZE, KernelCont, KernelStack, MAX_PROC, Pcb, SCHED, Sched, State,
+    TrapFrame,
 };
 
 pub(super) static mut KSTACKS: [KernelStack; MAX_PROC] = [KernelStack([0; KSTACK_SIZE]); MAX_PROC];
@@ -168,6 +168,7 @@ pub(super) fn unload_all() {
     let mut s = SCHED.lock();
     for slot in 0..MAX_PROC {
         if let Some(mut pcb) = s.procs[slot].take() {
+            pcb.fds.close_all();
             if let Some(image) = pcb.image.take() {
                 drop(s);
                 elfload::unload(image);
@@ -178,6 +179,7 @@ pub(super) fn unload_all() {
 }
 
 pub(super) fn drop_pcb(mut pcb: Pcb) {
+    pcb.fds.close_all();
     if let Some(image) = pcb.image.take() {
         elfload::unload(image);
     }

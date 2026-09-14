@@ -63,11 +63,7 @@ pub fn init(rsdp_addr: Option<usize>) {
 
 fn century_from_parse() -> Option<u8> {
     let c = CENTURY.load(Ordering::Relaxed);
-    if c == 0 {
-        None
-    } else {
-        Some(c)
-    }
+    if c == 0 { None } else { Some(c) }
 }
 
 pub fn reboot() {
@@ -147,11 +143,7 @@ fn rsdp_bytes(addr: usize) -> Option<&'static [u8]> {
     }
     let n = if head[15] >= 2 {
         let len = u32_at(head, 20) as usize;
-        if (20..=36).contains(&len) {
-            len
-        } else {
-            36
-        }
+        if (20..=36).contains(&len) { len } else { 36 }
     } else {
         20
     };
@@ -161,11 +153,7 @@ fn rsdp_bytes(addr: usize) -> Option<&'static [u8]> {
 fn rsdp_phys(addr: usize) -> u64 {
     let a = addr as u64;
     let hhdm = vmm::hhdm_offset();
-    if a >= hhdm {
-        a - hhdm
-    } else {
-        a
-    }
+    if a >= hhdm { a - hhdm } else { a }
 }
 
 fn map_bytes(phys: u64, len: usize) -> Option<&'static [u8]> {
@@ -264,11 +252,7 @@ fn dsdt_phys(fadt: &[u8]) -> Option<u64> {
         }
     }
     let d = u32_at(fadt, 40) as u64;
-    if d == 0 {
-        None
-    } else {
-        Some(d)
-    }
+    if d == 0 { None } else { Some(d) }
 }
 
 fn io32(fadt: &[u8], off: usize) -> Option<GasReg> {
@@ -296,10 +280,7 @@ fn gas_at(tab: &[u8], off: usize) -> Option<GasReg> {
         return None;
     }
     match space {
-        GAS_IO => Some(GasReg {
-            mem: false,
-            addr,
-        }),
+        GAS_IO => Some(GasReg { mem: false, addr }),
         GAS_MEM => Some(GasReg { mem: true, addr }),
         _ => None,
     }
@@ -313,7 +294,8 @@ fn parse_s5(dsdt: &[u8]) -> Option<(u8, Option<u8>)> {
     let mut i = 0;
     while i + 4 <= body.len() {
         if &body[i..i + 4] == b"_S5_" {
-            let prev_ok = i == 0 || matches!(body[i - 1], NAME_OP | DUAL_NAME | MULTI_NAME | ROOT_CHAR);
+            let prev_ok =
+                i == 0 || matches!(body[i - 1], NAME_OP | DUAL_NAME | MULTI_NAME | ROOT_CHAR);
             if prev_ok {
                 if let Some(r) = parse_s5_pkg(&body[i + 4..]) {
                     return Some(r);

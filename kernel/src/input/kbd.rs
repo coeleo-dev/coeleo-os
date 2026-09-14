@@ -17,6 +17,8 @@ static HEAD: AtomicUsize = AtomicUsize::new(0);
 static TAIL: AtomicUsize = AtomicUsize::new(0);
 static LALT: AtomicBool = AtomicBool::new(false);
 static RALT: AtomicBool = AtomicBool::new(false);
+static LSHIFT: AtomicBool = AtomicBool::new(false);
+static RSHIFT: AtomicBool = AtomicBool::new(false);
 
 pub enum Key {
     Tab,
@@ -27,6 +29,7 @@ pub enum Key {
     Right,
     Enter,
     Backspace,
+    Delete,
     Char(u8),
     AltSpace,
 }
@@ -35,27 +38,42 @@ pub enum Key {
 pub fn dispatch(key: Key) {
     match key {
         Key::AltSpace => crate::comp::irq_krunner(),
-        Key::Tab => crate::comp::irq_tab(),
+        Key::Tab => {
+            if !crate::comp::irq_tab() {
+                enqueue_or_kill(b'\t');
+            }
+        }
         Key::Esc => {
             let _ = crate::comp::irq_esc();
         }
         Key::Up => {
-            let _ = crate::comp::irq_files_key(crate::comp::FilesKey::Up);
+            if !crate::comp::irq_files_key(crate::comp::FilesKey::Up) {
+                enqueue_csi(b'A');
+            }
         }
         Key::Down => {
-            let _ = crate::comp::irq_files_key(crate::comp::FilesKey::Down);
+            if !crate::comp::irq_files_key(crate::comp::FilesKey::Down) {
+                enqueue_csi(b'B');
+            }
         }
         Key::Left => {
-            let _ = crate::comp::irq_files_key(crate::comp::FilesKey::Left);
+            if !crate::comp::irq_files_key(crate::comp::FilesKey::Left) {
+                enqueue_csi(b'D');
+            }
         }
         Key::Right => {
-            let _ = crate::comp::irq_files_key(crate::comp::FilesKey::Right);
+            if !crate::comp::irq_files_key(crate::comp::FilesKey::Right) {
+                enqueue_csi(b'C');
+            }
         }
         Key::Enter => {
             if crate::comp::irq_files_key(crate::comp::FilesKey::Enter) {
                 return;
             }
             enqueue_or_kill(b'\n');
+        }
+        Key::Delete => {
+            let _ = crate::comp::irq_files_key(crate::comp::FilesKey::Delete);
         }
         Key::Backspace => {
             if crate::comp::irq_files_key(crate::comp::FilesKey::Backspace) {
@@ -98,21 +116,25 @@ pub fn push(scancode: u8) -> Option<u8> {
     let event = {
         let mut kbd = KBD.lock();
         match kbd.add_byte(scancode) {
-            Ok(Some(ev)) => kbd.process_keyevent(ev),
+            Ok(Some(ev)) => {
+                note_shift(ev.code, ev.state);
+                kbd.process_keyevent(ev)
+            }
             _ => None,
         }
     };
     match event {
         Some(DecodedKey::Unicode(c)) if c.is_ascii() => Some(c as u8),
-        Some(DecodedKey::RawKey(KeyCode::Backspace | KeyCode::Delete)) => Some(0x08),
+        Some(DecodedKey::RawKey(KeyCode::Backspace)) => Some(0x08),
         Some(DecodedKey::RawKey(KeyCode::Return | KeyCode::NumpadEnter)) => Some(b'\n'),
+        Some(DecodedKey::RawKey(KeyCode::Oem7)) => Some(oem7_byte()),
         _ => None,
     }
 }
 
 /// Drain the scancode queue into decoded bytes. Ctrl+C (0x03) kills the
-/// foreground child and is not enqueued. Tab always switches compositor
-/// focus; arrows/Enter/Backspace go to the file panel when it is focused.
+/// foreground child and is not enqueued. Tab/arrows go to the compositor
+/// when Files or an overlay has focus; otherwise Tab and arrows reach stdin.
 pub fn drain_ps2() {
     while let Some(sc) = crate::ps2::pop() {
         let (event, krunner) = {
@@ -120,6 +142,7 @@ pub fn drain_ps2() {
             match kbd.add_byte(sc) {
                 Ok(Some(ev)) => {
                     note_alt(ev.code, ev.state);
+                    note_shift(ev.code, ev.state);
                     if ev.code == KeyCode::Spacebar && ev.state == KeyState::Down && alt_down() {
                         (None, true)
                     } else {
@@ -143,10 +166,14 @@ pub fn drain_ps2() {
             Some(DecodedKey::RawKey(KeyCode::Return | KeyCode::NumpadEnter)) => {
                 dispatch(Key::Enter);
             }
-            Some(DecodedKey::RawKey(KeyCode::Backspace | KeyCode::Delete)) => {
+            Some(DecodedKey::RawKey(KeyCode::Backspace)) => {
                 dispatch(Key::Backspace);
             }
+            Some(DecodedKey::RawKey(KeyCode::Delete)) => {
+                dispatch(Key::Delete);
+            }
             Some(DecodedKey::Unicode(c)) if c.is_ascii() => dispatch(Key::Char(c as u8)),
+            Some(DecodedKey::RawKey(KeyCode::Oem7)) => dispatch(Key::Char(oem7_byte())),
             _ => {}
         }
     }
@@ -161,8 +188,33 @@ fn note_alt(code: KeyCode, state: KeyState) {
     }
 }
 
+fn note_shift(code: KeyCode, state: KeyState) {
+    let down = state == KeyState::Down;
+    match code {
+        KeyCode::LShift => LSHIFT.store(down, Ordering::Release),
+        KeyCode::RShift => RSHIFT.store(down, Ordering::Release),
+        _ => {}
+    }
+}
+
 fn alt_down() -> bool {
     LALT.load(Ordering::Acquire) || RALT.load(Ordering::Acquire)
+}
+
+fn shift_down() -> bool {
+    LSHIFT.load(Ordering::Acquire) || RSHIFT.load(Ordering::Acquire)
+}
+
+/// ANSI `\\`/`|` is scancode 0x2B. pc-keyboard Set1 labels that Oem7; Us104Key
+/// only maps Oem5 (ISO 0x56).
+fn oem7_byte() -> u8 {
+    if shift_down() { b'|' } else { b'\\' }
+}
+
+fn enqueue_csi(final_byte: u8) {
+    enqueue_or_kill(0x1B);
+    enqueue_or_kill(b'[');
+    enqueue_or_kill(final_byte);
 }
 
 fn enqueue_or_kill(b: u8) {

@@ -1,26 +1,39 @@
 #![no_std]
 #![no_main]
 
+mod complete;
 mod cwd;
+mod exec;
 mod fs;
+mod line;
 mod net;
 mod path;
 mod pkg;
 
-use libcoeleo::{ERR, INFO_DISK, INFO_INSTALL, INFO_MEM, clock_ms, date, poweroff, ps, reboot, spawn, sync, sysinfo, write};
+use libcoeleo::{
+    ERR, INFO_DISK, INFO_INSTALL, INFO_MEM, clock_ms, date, poweroff, ps, reboot, spawn, sync,
+    sysinfo, write,
+};
 
 use cwd::Cwd;
-use fs::{submit_write, WriteJob, WriteNext};
+use fs::{WriteJob, WriteNext, submit_write};
+use line::{History, LINE_CAP, read_line};
 use net::{cmd_get, cmd_ping};
 use path::{cmd_path, cmd_run, cmd_spawn_wait};
 use pkg::cmd_pkg;
 
 const PROMPT: &[u8] = b"\x1b[1;96mcoeleo>\x1b[0m";
-const HELP: &[u8] = b"mem, uptime, disk, ls, cd, cat, touch, write, rm, sync, run, ping, get, ps, clock, pkg, date, reboot, poweroff, install\n\
+const HELP: &[u8] = b"mem, uptime, disk, ls, cd, cat, touch, write, rm, mkdir, cp, mv, echo, pwd, clear, sync, run, ping, get, ps, clock, pkg, date, reboot, poweroff, install, edit\n\
 ls [path]           list directory\n\
 cd <path>           change directory\n\
+pwd                 print cwd\n\
 cat <path>          print file\n\
 touch <path>        create empty file\n\
+mkdir <path>        create directory\n\
+cp <src> <dst>      copy file\n\
+mv <src> <dst>      move file\n\
+echo [text]         print arguments\n\
+clear               clear the VT\n\
 write <path>        lines until a line with only .\n\
 rm <path>           delete file\n\
 sync                flush disk\n\
@@ -32,19 +45,22 @@ date                civil date from the RTC (UTC)\n\
 reboot              restart the machine\n\
 poweroff / halt     cut power\n\
 install <n>         type twice to wipe disk n and install Coeleo\n\
+edit <path>         TUI editor (^S save, ^Q quit)\n\
+| > <               pipe stdout; redirect file (ELF)\n\
+Up / Tab / arrows   history; complete; move cursor\n\
 ps / clock / mem / disk / uptime\n";
-const LINE_CAP: usize = 128;
 
 #[unsafe(no_mangle)]
 pub extern "C" fn _start() -> ! {
     let mut cwd = Cwd::new();
+    let mut hist = History::new();
     let mut line = [0u8; LINE_CAP];
     let mut writing: Option<WriteJob> = None;
     loop {
         if writing.is_none() {
             let _ = write(1, PROMPT);
         }
-        let n = read_line(&mut line);
+        let n = read_line(&mut line, &mut hist, &cwd, PROMPT, writing.is_none());
         if n == usize::MAX {
             libcoeleo::exit(0);
         }
@@ -60,41 +76,13 @@ pub extern "C" fn _start() -> ! {
     }
 }
 
-fn read_line(line: &mut [u8]) -> usize {
-    let mut n = 0;
-    loop {
-        let mut c = [0u8; 1];
-        let r = libcoeleo::read(0, &mut c);
-        if r == 0 {
-            return usize::MAX;
-        }
-        if r == ERR {
-            continue;
-        }
-        match c[0] {
-            b'\n' | b'\r' => {
-                let _ = write(1, b"\n");
-                return n;
-            }
-            0x08 | 0x7f => {
-                if n > 0 {
-                    n -= 1;
-                    let _ = write(1, b"\x08 \x08");
-                }
-            }
-            b if (b.is_ascii_graphic() || b == b' ') && n < line.len() => {
-                line[n] = b;
-                n += 1;
-                let _ = write(1, &c);
-            }
-            _ => {}
-        }
-    }
-}
-
 fn dispatch(line: &str, cwd: &mut Cwd, writing: &mut Option<WriteJob>) {
     let line = line.trim();
     if line.is_empty() {
+        return;
+    }
+    if exec::has_meta(line) {
+        exec::run_line(cwd, line);
         return;
     }
     let (cmd, args) = match line.split_once(' ') {
@@ -109,6 +97,14 @@ fn dispatch(line: &str, cwd: &mut Cwd, writing: &mut Option<WriteJob>) {
         "ls" => fs::cmd_ls(cwd, args),
         "cat" => fs::cmd_cat(cwd, args),
         "cd" => fs::cmd_cd(cwd, args),
+        "pwd" => fs::cmd_pwd(cwd),
+        "echo" => cmd_echo(args),
+        "clear" => {
+            let _ = write(1, b"\x1b[2J\x1b[H");
+        }
+        "mkdir" => fs::cmd_mkdir(cwd, args),
+        "cp" => fs::cmd_cp(cwd, args),
+        "mv" => fs::cmd_mv(cwd, args),
         "ps" => cmd_ps(),
         "clock" => cmd_clock(),
         "spin" => cmd_spawn_wait("spin"),
@@ -136,8 +132,15 @@ fn dispatch(line: &str, cwd: &mut Cwd, writing: &mut Option<WriteJob>) {
         "get" => cmd_get(args),
         "pkg" => cmd_pkg(cwd, args),
         "install" => cmd_install(args),
-        _ => cmd_path(cmd),
+        _ => cmd_path(cmd, args),
     }
+}
+
+fn cmd_echo(args: &str) {
+    if !args.is_empty() {
+        let _ = write(1, args.as_bytes());
+    }
+    let _ = write(1, b"\n");
 }
 
 fn cmd_sysinfo(kind: u64) {

@@ -353,11 +353,11 @@ fn cmd_ping(args: &str) {
         console::write("ping: missing address\n");
         return;
     }
-    let Some(addr) = crate::net::parse_ipv4(tok) else {
+    if crate::net::parse_ipv4(tok).is_none() && !crate::net::is_hostname(tok) {
         console::write("ping: bad address\n");
         return;
-    };
-    match crate::net::ping(addr) {
+    }
+    match crate::net::ping_target(tok) {
         Err(crate::net::PingError::NoNet) => console::write("ping: no network\n"),
         Err(crate::net::PingError::Failed) => console::write("ping: failed\n"),
         Ok(replies) if replies.is_empty() => console::write("ping: timeout\n"),
@@ -378,10 +378,6 @@ fn cmd_get(args: &str) {
         return;
     }
     let url = match crate::http::parse_url(tok) {
-        Err(crate::http::UrlError::Https) => {
-            console::write("get: https not supported\n");
-            return;
-        }
         Err(crate::http::UrlError::Bad) => {
             console::write("get: bad url\n");
             return;
@@ -391,6 +387,7 @@ fn cmd_get(args: &str) {
     match crate::net::http_get(&url) {
         Err(crate::net::HttpError::NoNet) => console::write("get: no network\n"),
         Err(crate::net::HttpError::Timeout) => console::write("get: timeout\n"),
+        Err(crate::net::HttpError::Https) => console::write("get: tls\n"),
         Err(crate::net::HttpError::Failed) => console::write("get: failed\n"),
         Ok(body) => match core::str::from_utf8(&body) {
             Ok(s) => console::write(s),

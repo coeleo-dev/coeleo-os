@@ -92,6 +92,27 @@ pub fn sys_date(buf: u64, len: u64) -> u64 {
     n as u64
 }
 
+pub fn unix_timestamp() -> Option<u64> {
+    let c = read_fresh()?;
+    let mut y = c.year as i64;
+    let m = c.month as i64;
+    let d = c.day as i64;
+    y -= (m <= 2) as i64;
+    let era = if y >= 0 { y } else { y - 399 } / 400;
+    let yoe = y - era * 400;
+    let doy = (153 * (if m > 2 { m - 3 } else { m + 9 }) + 2) / 5 + d - 1;
+    let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+    let days = era * 146097 + doe - 719468;
+    if days < 0 {
+        return None;
+    }
+    let secs = (days as u64) * 86400
+        + (c.hour as u64) * 3600
+        + (c.min as u64) * 60
+        + (c.sec as u64);
+    Some(secs)
+}
+
 fn cached() -> Option<Civil> {
     let sec = crate::clock::seconds();
     if CACHE_SEC.load(Ordering::Relaxed) != sec {
@@ -229,11 +250,7 @@ fn hour12(h: u8, pm: bool) -> Option<u8> {
 }
 
 fn decode_u8(v: u8, bin: bool) -> Option<u8> {
-    if bin {
-        Some(v)
-    } else {
-        bcd(v)
-    }
+    if bin { Some(v) } else { bcd(v) }
 }
 
 fn bcd(v: u8) -> Option<u8> {

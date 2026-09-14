@@ -68,6 +68,7 @@ fn label(name: &str) -> &str {
         "widgets" => "Widgets",
         "winprobe" => "Winprobe",
         "install" => "Install Coeleo",
+        "edit" => "Edit",
         other => other,
     }
 }
@@ -114,6 +115,8 @@ pub fn paint(
     rows: &[String],
     sel: usize,
     caret_on: bool,
+    mx: u32,
+    my: u32,
 ) {
     let t = Target {
         addr: fb.addr,
@@ -155,6 +158,7 @@ pub fn paint(
         dclip,
     );
     let ry0 = qy.saturating_add(QUERY_H);
+    let hover = hit(popup, mx, my, rows.len());
     if rows.is_empty() {
         coeleo_draw::text(
             t,
@@ -182,7 +186,7 @@ pub fn paint(
                 label(name),
                 Some(ic),
                 i == sel,
-                false,
+                hover == Hit::Row(i) && i != sel,
                 dclip,
             );
         }

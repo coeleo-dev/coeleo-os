@@ -262,6 +262,19 @@ pub fn exists(path: &str) -> bool {
     }
 }
 
+pub fn mkdir(path: &str) -> Result<(), FsError> {
+    let rel = path_rel(path)?;
+    let fs = FS.lock();
+    let fs = fs.as_ref().ok_or(FsError::NoFs)?;
+    match fs.root_dir().open_dir(&rel) {
+        Ok(_) => return Err(FsError::IsDir),
+        Err(Error::NotFound) | Err(Error::InvalidInput) => {}
+        Err(_) => return Err(FsError::Io),
+    }
+    fs.root_dir().create_dir(&rel).map_err(map_dir_err)?;
+    Ok(())
+}
+
 pub fn touch(path: &str) -> Result<(), FsError> {
     let rel = path_rel(path)?;
     let fs = FS.lock();
@@ -381,6 +394,7 @@ fn map_dir_err(e: Error<()>) -> FsError {
     match e {
         Error::NotFound => FsError::NotFound,
         Error::InvalidInput => FsError::NotDir,
+        Error::AlreadyExists => FsError::IsDir,
         _ => FsError::Io,
     }
 }

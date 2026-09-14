@@ -101,25 +101,43 @@ pub fn release(dev: Dev) {
 
 pub fn control(dev: Dev, setup: Setup, data: &mut [u8]) -> Result<usize, ()> {
     let mut g = HOSTS.lock();
-    let hc = g.get_mut(dev.hc as usize).and_then(|h| h.as_mut()).ok_or(())?;
+    let hc = g
+        .get_mut(dev.hc as usize)
+        .and_then(|h| h.as_mut())
+        .ok_or(())?;
     slot::control_inner(hc, dev.slot, setup, data)
 }
 
-pub fn configure_bulk(dev: Dev, ep_out: u8, ep_in: u8, max_out: u16, max_in: u16) -> Result<(), ()> {
+pub fn configure_bulk(
+    dev: Dev,
+    ep_out: u8,
+    ep_in: u8,
+    max_out: u16,
+    max_in: u16,
+) -> Result<(), ()> {
     let mut g = HOSTS.lock();
-    let hc = g.get_mut(dev.hc as usize).and_then(|h| h.as_mut()).ok_or(())?;
+    let hc = g
+        .get_mut(dev.hc as usize)
+        .and_then(|h| h.as_mut())
+        .ok_or(())?;
     slot::config_bulk(hc, dev.slot, ep_out, ep_in, max_out, max_in)
 }
 
 pub fn bulk_out(dev: Dev, buf: &[u8]) -> Result<(), ()> {
     let mut g = HOSTS.lock();
-    let hc = g.get_mut(dev.hc as usize).and_then(|h| h.as_mut()).ok_or(())?;
+    let hc = g
+        .get_mut(dev.hc as usize)
+        .and_then(|h| h.as_mut())
+        .ok_or(())?;
     slot::bounce_out(hc, dev.slot, buf)
 }
 
 pub fn bulk_in(dev: Dev, buf: &mut [u8]) -> Result<(), ()> {
     let mut g = HOSTS.lock();
-    let hc = g.get_mut(dev.hc as usize).and_then(|h| h.as_mut()).ok_or(())?;
+    let hc = g
+        .get_mut(dev.hc as usize)
+        .and_then(|h| h.as_mut())
+        .ok_or(())?;
     slot::bounce_in(hc, dev.slot, buf)
 }
 
@@ -136,7 +154,10 @@ pub fn configure_interrupt(dev: Dev, eps: &[(u8, u16)]) -> Result<(), ()> {
         };
     }
     let mut g = HOSTS.lock();
-    let hc = g.get_mut(dev.hc as usize).and_then(|h| h.as_mut()).ok_or(())?;
+    let hc = g
+        .get_mut(dev.hc as usize)
+        .and_then(|h| h.as_mut())
+        .ok_or(())?;
     slot::config_interrupt(hc, dev.slot, &specs[..n])
 }
 
@@ -186,13 +207,18 @@ fn enumerate_host(hc: &mut Host) {
 
 fn classify(hc: &mut Host, slot: u8) {
     let mut dev = [0u8; 18];
-    if control_on(hc, slot, Setup {
-        ty: 0x80,
-        req: 6,
-        value: 0x0100,
-        index: 0,
-        len: 18,
-    }, &mut dev)
+    if control_on(
+        hc,
+        slot,
+        Setup {
+            ty: 0x80,
+            req: 6,
+            value: 0x0100,
+            index: 0,
+            len: 18,
+        },
+        &mut dev,
+    )
     .is_err()
     {
         slot::disable_slot(hc, slot);

@@ -12,12 +12,12 @@ pub fn cmd_ping(args: &str) {
         let _ = write(1, b"ping: missing address\n");
         return;
     }
-    let Some(oct) = parse_ipv4(tok) else {
+    if parse_ipv4(tok).is_none() && !looks_hostname(tok) {
         let _ = write(1, b"ping: bad address\n");
         return;
-    };
+    }
     let mut buf = [0u8; 32];
-    let r = net_ping(oct, &mut buf);
+    let r = net_ping(tok, &mut buf);
     if r == ERR_NO_NET {
         let _ = write(1, b"ping: no network\n");
         return;
@@ -74,6 +74,26 @@ fn parse_ipv4(s: &str) -> Option<[u8; 4]> {
     Some(oct)
 }
 
+fn looks_hostname(s: &str) -> bool {
+    let s = s.strip_suffix('.').unwrap_or(s);
+    if s.is_empty() || s.len() > 253 || !s.contains('.') {
+        return false;
+    }
+    for lab in s.split('.') {
+        if lab.is_empty() || lab.len() > 63 {
+            return false;
+        }
+        if !lab
+            .as_bytes()
+            .iter()
+            .all(|b| b.is_ascii_alphanumeric() || *b == b'-')
+        {
+            return false;
+        }
+    }
+    true
+}
+
 fn parse_u8(s: &str) -> Option<u8> {
     let mut v: u16 = 0;
     for b in s.bytes() {
@@ -97,7 +117,7 @@ pub fn cmd_get(args: &str) {
     let buf = unsafe { &mut *core::ptr::addr_of_mut!(GET_BUF) };
     let r = http_get(tok, buf);
     if r == ERR_HTTPS {
-        let _ = write(1, b"get: https not supported\n");
+        let _ = write(1, b"get: tls\n");
         return;
     }
     if r == ERR_BAD_URL {

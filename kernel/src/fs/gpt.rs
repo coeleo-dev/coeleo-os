@@ -33,15 +33,7 @@ pub fn write_esp(disk: usize) -> Result<(), ()> {
     let array_crc = array_crc32(&entry);
 
     let mut primary = [0u8; SECTOR_SIZE];
-    fill_header(
-        &mut primary,
-        1,
-        last,
-        2,
-        last_usable,
-        disk_guid,
-        array_crc,
-    );
+    fill_header(&mut primary, 1, last, 2, last_usable, disk_guid, array_crc);
     let mut backup = [0u8; SECTOR_SIZE];
     fill_header(
         &mut backup,

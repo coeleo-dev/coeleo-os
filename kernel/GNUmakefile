@@ -27,7 +27,7 @@ endif
 # Default target.
 .PHONY: all
 all:
-	RUSTFLAGS="-C relocation-model=static -C no-redzone=yes" cargo build --target $(RUST_TARGET) --profile $(RUST_PROFILE)
+	RUSTFLAGS="-C relocation-model=static -C no-redzone=yes --cfg curve25519_dalek_backend=\"serial\" --cfg polyval_force_soft --cfg poly1305_force_soft --cfg chacha20_force_soft --cfg aes_force_soft" cargo build --target $(RUST_TARGET) --profile $(RUST_PROFILE)
 	cp target/$(RUST_TARGET)/$(RUST_PROFILE_SUBDIR)/$(OUTPUT) kernel
 
 # Remove object files and the final executable.

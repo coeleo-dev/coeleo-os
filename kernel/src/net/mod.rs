@@ -1,6 +1,10 @@
-//! In-kernel IPv4: ICMP echo and HTTP/1.0 GET. No DNS or DHCP.
+//! In-kernel IPv4: DHCP, DNS A, ICMP echo, HTTP/1.0 GET.
 
+pub mod dhcp;
+pub mod dns;
+pub mod e1000e;
 pub mod http;
+pub mod tls;
 pub mod virtio_hal;
 pub mod virtio_net;
 pub mod virtio_pci;
@@ -11,15 +15,18 @@ use alloc::vec::Vec;
 use core::fmt::Write;
 
 use smoltcp::iface::{Config, Interface, SocketHandle, SocketSet};
-use smoltcp::phy::Device;
-use smoltcp::socket::{icmp, tcp};
+use smoltcp::phy::{Device, DeviceCapabilities, RxToken, TxToken};
+use smoltcp::socket::{dhcpv4, dns as dns_sock, icmp, tcp};
 use smoltcp::time::Instant;
-use smoltcp::wire::{EthernetAddress, Icmpv4Packet, Icmpv4Repr, IpAddress, IpCidr, Ipv4Address};
+use smoltcp::wire::{EthernetAddress, Icmpv4Packet, Icmpv4Repr, IpAddress, Ipv4Address};
 use spin::Mutex;
 
 use crate::clock;
-use crate::http::Url;
+use crate::e1000e::E1000e;
+use crate::http::{Host, Url};
 use crate::virtio_net::VirtioNetDev;
+
+pub use dns::is_hostname;
 
 const OUR_IP: Ipv4Address = Ipv4Address::new(10, 0, 2, 15);
 const GATEWAY: Ipv4Address = Ipv4Address::new(10, 0, 2, 2);
@@ -27,19 +34,112 @@ const PREFIX: u8 = 24;
 const ICMP_IDENT: u16 = 0x22b;
 const PING_COUNT: u16 = 4;
 const TIMEOUT_TICKS: u64 = 200;
-const GET_TIMEOUT_TICKS: u64 = 500;
+pub(super) const GET_TIMEOUT_TICKS: u64 = 500;
 const CLOSE_TIMEOUT_TICKS: u64 = 100;
 const ECHO_PAYLOAD: [u8; 16] = [0u8; 16];
-const BODY_CAP: usize = 32 * 1024;
+pub(super) const BODY_CAP: usize = 32 * 1024;
 const FIRST_LOCAL_PORT: u16 = 49152;
 
-struct Net {
-    device: VirtioNetDev,
+pub(super) struct Net {
+    device: Nic,
     iface: Interface,
-    sockets: SocketSet<'static>,
+    pub(super) sockets: SocketSet<'static>,
     icmp: SocketHandle,
-    tcp: SocketHandle,
+    pub(super) tcp: SocketHandle,
+    dhcp: SocketHandle,
+    dns: SocketHandle,
     next_port: u16,
+    lease: dhcp::Lease,
+    announced: bool,
+    has_dns: bool,
+    dns_cache: dns::Cache,
+}
+
+enum Nic {
+    Virtio(VirtioNetDev),
+    E1000e(E1000e),
+}
+
+impl Nic {
+    fn probe() -> Option<Self> {
+        if let Some(v) = VirtioNetDev::probe() {
+            return Some(Nic::Virtio(v));
+        }
+        E1000e::probe().map(Nic::E1000e)
+    }
+
+    fn mac(&self) -> [u8; 6] {
+        match self {
+            Nic::Virtio(d) => d.mac(),
+            Nic::E1000e(d) => d.mac(),
+        }
+    }
+}
+
+enum RxTok {
+    Virtio(virtio_net::RxTok),
+    E1000e(e1000e::RxTok),
+}
+
+enum TxTok<'a> {
+    Virtio(virtio_net::TxTok<'a>),
+    E1000e(e1000e::TxTok<'a>),
+}
+
+impl Device for Nic {
+    type RxToken<'a> = RxTok;
+    type TxToken<'a> = TxTok<'a>;
+
+    fn receive(&mut self, timestamp: Instant) -> Option<(Self::RxToken<'_>, Self::TxToken<'_>)> {
+        match self {
+            Nic::Virtio(d) => {
+                let (rx, tx) = d.receive(timestamp)?;
+                Some((RxTok::Virtio(rx), TxTok::Virtio(tx)))
+            }
+            Nic::E1000e(d) => {
+                let (rx, tx) = d.receive(timestamp)?;
+                Some((RxTok::E1000e(rx), TxTok::E1000e(tx)))
+            }
+        }
+    }
+
+    fn transmit(&mut self, timestamp: Instant) -> Option<Self::TxToken<'_>> {
+        match self {
+            Nic::Virtio(d) => Some(TxTok::Virtio(d.transmit(timestamp)?)),
+            Nic::E1000e(d) => Some(TxTok::E1000e(d.transmit(timestamp)?)),
+        }
+    }
+
+    fn capabilities(&self) -> DeviceCapabilities {
+        match self {
+            Nic::Virtio(d) => d.capabilities(),
+            Nic::E1000e(d) => d.capabilities(),
+        }
+    }
+}
+
+impl RxToken for RxTok {
+    fn consume<R, F>(self, f: F) -> R
+    where
+        F: FnOnce(&[u8]) -> R,
+    {
+        match self {
+            RxTok::Virtio(t) => t.consume(f),
+            RxTok::E1000e(t) => t.consume(f),
+        }
+    }
+}
+
+impl TxToken for TxTok<'_> {
+    fn consume<R, F>(self, len: usize, f: F) -> R
+    where
+        F: FnOnce(&mut [u8]) -> R,
+    {
+        match self {
+            TxTok::Virtio(t) => t.consume(len, f),
+            TxTok::E1000e(t) => t.consume(len, f),
+        }
+    }
 }
 
 static NET: Mutex<Option<Net>> = Mutex::new(None);
@@ -58,6 +158,7 @@ pub enum HttpError {
     NoNet,
     Timeout,
     Failed,
+    Https,
 }
 
 pub const ERR: u64 = u64::MAX;
@@ -70,17 +171,13 @@ const URL_MAX: usize = 256;
 const HTTP_GET_ARGS: usize = 32;
 
 pub fn init() {
-    let Some(mut device) = VirtioNetDev::probe() else {
+    let Some(mut device) = Nic::probe() else {
         return;
     };
     let mut config = Config::new(EthernetAddress(device.mac()).into());
     config.random_seed = clock::ticks();
     let now = Instant::from_millis(clock::millis() as i64);
-    let mut iface = Interface::new(config, &mut device, now);
-    iface.update_ip_addrs(|addrs| {
-        let _ = addrs.push(IpCidr::new(IpAddress::Ipv4(OUR_IP), PREFIX));
-    });
-    let _ = iface.routes_mut().add_default_ipv4_route(GATEWAY);
+    let iface = Interface::new(config, &mut device, now);
 
     let mut sockets = SocketSet::new(Vec::new());
     let icmp = sockets.add(icmp_socket());
@@ -91,6 +188,8 @@ pub fn init() {
         }
     }
     let tcp = sockets.add(tcp_socket());
+    let dhcp = sockets.add(dhcpv4::Socket::new());
+    let dns_h = sockets.add(dns_sock::Socket::new(&[], vec![None]));
 
     *NET.lock() = Some(Net {
         device,
@@ -98,7 +197,13 @@ pub fn init() {
         sockets,
         icmp,
         tcp,
+        dhcp,
+        dns: dns_h,
         next_port: FIRST_LOCAL_PORT,
+        lease: dhcp::Lease::Discovering,
+        announced: false,
+        has_dns: false,
+        dns_cache: dns::Cache::new(),
     });
 }
 
@@ -129,9 +234,21 @@ pub fn parse_ipv4(s: &str) -> Option<Ipv4Address> {
     Some(Ipv4Address::new(oct[0], oct[1], oct[2], oct[3]))
 }
 
-pub fn ping(dest: Ipv4Address) -> Result<Vec<PingReply>, PingError> {
+pub fn ping_target(name: &str) -> Result<Vec<PingReply>, PingError> {
     let mut net = NET.lock();
     let net = net.as_mut().ok_or(PingError::NoNet)?;
+    dhcp::ensure_lease(net);
+    let dest = if let Some(ip) = parse_ipv4(name) {
+        ip
+    } else if dns::is_hostname(name) {
+        dns::resolve(net, name).ok_or(PingError::Failed)?
+    } else {
+        return Err(PingError::Failed);
+    };
+    ping_locked(net, dest)
+}
+
+fn ping_locked(net: &mut Net, dest: Ipv4Address) -> Result<Vec<PingReply>, PingError> {
     let remote = IpAddress::Ipv4(dest);
     let mut replies = Vec::new();
 
@@ -160,9 +277,13 @@ pub fn ping(dest: Ipv4Address) -> Result<Vec<PingReply>, PingError> {
 pub fn http_get(url: &Url) -> Result<Vec<u8>, HttpError> {
     let mut net = NET.lock();
     let net = net.as_mut().ok_or(HttpError::NoNet)?;
+    dhcp::ensure_lease(net);
     close_tcp(net);
 
-    let host = Ipv4Address::new(url.host[0], url.host[1], url.host[2], url.host[3]);
+    let host = match &url.host {
+        Host::V4(o) => Ipv4Address::new(o[0], o[1], o[2], o[3]),
+        Host::Name(n) => dns::resolve(net, n).ok_or(HttpError::Failed)?,
+    };
     let remote = (IpAddress::Ipv4(host), url.port);
     let local = net.next_port;
     net.next_port = if net.next_port == u16::MAX {
@@ -184,12 +305,23 @@ pub fn http_get(url: &Url) -> Result<Vec<u8>, HttpError> {
             .map_err(|_| HttpError::Failed)?;
     }
 
+    if url.scheme == crate::http::Scheme::Https {
+        return tls::tls_get(net, url);
+    }
+
     let mut req = String::new();
-    let _ = write!(
-        req,
-        "GET {} HTTP/1.0\r\nHost: {}.{}.{}.{}\r\n\r\n",
-        url.path, url.host[0], url.host[1], url.host[2], url.host[3]
-    );
+    match &url.host {
+        Host::V4(o) => {
+            let _ = write!(
+                req,
+                "GET {} HTTP/1.0\r\nHost: {}.{}.{}.{}\r\n\r\n",
+                url.path, o[0], o[1], o[2], o[3]
+            );
+        }
+        Host::Name(n) => {
+            let _ = write!(req, "GET {} HTTP/1.0\r\nHost: {}\r\n\r\n", url.path, n);
+        }
+    }
 
     let t0 = clock::ticks();
     let mut sent = 0;
@@ -284,7 +416,7 @@ fn tcp_socket() -> tcp::Socket<'static> {
     )
 }
 
-fn abort_tcp(net: &mut Net) {
+pub(super) fn abort_tcp(net: &mut Net) {
     net.sockets.get_mut::<tcp::Socket>(net.tcp).abort();
 }
 
@@ -338,24 +470,48 @@ fn take_echo_reply(net: &mut Net, seq: u16) -> Option<IpAddress> {
 }
 
 impl Net {
-    fn poll_inner(&mut self) {
+    pub(super) fn poll_inner(&mut self) {
         let now = Instant::from_millis(clock::millis() as i64);
         let _ = self.iface.poll(now, &mut self.device, &mut self.sockets);
+        dhcp::on_poll(self);
     }
 }
 
-fn enable_irq() {
+pub(super) fn enable_irq() {
     x86_64::instructions::interrupts::enable();
 }
 
-pub fn sys_net_ping(packed: u64, buf: u64, len: u64) -> u64 {
-    let dest = Ipv4Address::new(
-        packed as u8,
-        (packed >> 8) as u8,
-        (packed >> 16) as u8,
-        (packed >> 24) as u8,
-    );
-    let replies = match ping(dest) {
+const NAME_MAX: usize = 256;
+const PING_ARGS: usize = 32;
+
+pub fn sys_net_ping(args_ptr: u64) -> u64 {
+    if !crate::vmm::user_slice_ok(args_ptr, PING_ARGS as u64) {
+        return ERR;
+    }
+    let mut raw = [0u8; PING_ARGS];
+    if crate::fd::copy_from_user(args_ptr, PING_ARGS, &mut raw).is_err() {
+        return ERR;
+    }
+    let name_ptr = u64::from_le_bytes(raw[0..8].try_into().unwrap());
+    let name_len = u64::from_le_bytes(raw[8..16].try_into().unwrap());
+    let buf = u64::from_le_bytes(raw[16..24].try_into().unwrap());
+    let len = u64::from_le_bytes(raw[24..32].try_into().unwrap());
+    if name_len == 0 || name_len > NAME_MAX as u64 {
+        return ERR;
+    }
+    if !crate::vmm::user_slice_ok(name_ptr, name_len) {
+        return ERR;
+    }
+    let nname = name_len as usize;
+    let mut name_bytes = [0u8; NAME_MAX];
+    if crate::fd::copy_from_user(name_ptr, nname, &mut name_bytes).is_err() {
+        return ERR;
+    }
+    let name = match core::str::from_utf8(&name_bytes[..nname]) {
+        Ok(s) => s,
+        Err(_) => return ERR,
+    };
+    let replies = match ping_target(name) {
         Err(PingError::NoNet) => return ERR_NO_NET,
         Err(PingError::Failed) => return ERR,
         Ok(r) => r,
@@ -407,13 +563,13 @@ pub fn sys_http_get(args_ptr: u64) -> u64 {
         Err(_) => return ERR_BAD_URL,
     };
     let url = match crate::http::parse_url(url_str) {
-        Err(crate::http::UrlError::Https) => return ERR_HTTPS,
         Err(crate::http::UrlError::Bad) => return ERR_BAD_URL,
         Ok(u) => u,
     };
     let body = match http_get(&url) {
         Err(HttpError::NoNet) => return ERR_NO_NET,
         Err(HttpError::Timeout) => return ERR_TIMEOUT,
+        Err(HttpError::Https) => return ERR_HTTPS,
         Err(HttpError::Failed) => return ERR,
         Ok(b) => b,
     };

@@ -1,17 +1,18 @@
-//! Rasterize IBM Plex Mono into a grayscale atlas (host). The kernel never
+//! Rasterize Ubuntu Regular into a grayscale atlas (host). The kernel never
 //! sees the TTF.
 
 use std::env;
 use std::fs;
 use std::path::PathBuf;
 
-const PX: f32 = 11.0;
+/// 11 pt at 96 DPI (Yaru UI).
+const PX: f32 = 15.0;
 const PAD: i32 = 1;
 
 fn main() {
-    println!("cargo:rerun-if-changed=../../../docs/fonts/IBMPlexMono-Regular.ttf");
+    println!("cargo:rerun-if-changed=../../../docs/fonts/Ubuntu-R.ttf");
     let font_path = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap())
-        .join("../../../docs/fonts/IBMPlexMono-Regular.ttf");
+        .join("../../../docs/fonts/Ubuntu-R.ttf");
     let bytes =
         fs::read(&font_path).unwrap_or_else(|e| panic!("GUI font {}: {e}", font_path.display()));
     let font = fontdue::Font::from_bytes(bytes.as_slice(), fontdue::FontSettings::default())
@@ -22,8 +23,11 @@ fn main() {
     let mut min_ymin = 0i32;
     let mut max_xmax = 1i32;
     let mut max_ymax = 1i32;
+    let mut advances = [1u8; 95];
     for ch in 32u8..127 {
         let (m, bitmap) = font.rasterize(ch as char, PX);
+        let adv = m.advance_width.round().clamp(1.0, 24.0) as u8;
+        advances[(ch - 32) as usize] = adv;
         if m.width > 0 && m.height > 0 {
             min_xmin = min_xmin.min(m.xmin);
             min_ymin = min_ymin.min(m.ymin);
@@ -32,8 +36,8 @@ fn main() {
         }
         rasters.push((m, bitmap));
     }
-    let width = (max_xmax - min_xmin + PAD * 2).clamp(6, 10) as u32;
-    let height = (max_ymax - min_ymin + PAD * 2).clamp(12, 18) as u32;
+    let width = (max_xmax - min_xmin + PAD * 2).clamp(4, 20) as u32;
+    let height = (max_ymax - min_ymin + PAD * 2).clamp(10, 22) as u32;
     let place = Place {
         min_xmin,
         max_ymax,
@@ -47,7 +51,14 @@ fn main() {
     out.push_str(&width.to_string());
     out.push_str(";\npub const HEIGHT: u32 = ");
     out.push_str(&height.to_string());
-    out.push_str(";\npub static GLYPHS: [[u8; ");
+    out.push_str(";\npub static ADVANCE: [u8; 95] = [");
+    for (i, a) in advances.iter().enumerate() {
+        if i > 0 {
+            out.push(',');
+        }
+        out.push_str(&a.to_string());
+    }
+    out.push_str("];\npub static GLYPHS: [[u8; ");
     out.push_str(&(width * height).to_string());
     out.push_str("]; 95] = [\n");
 

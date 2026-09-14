@@ -1,16 +1,27 @@
-//! HTTP/1.0 URL and header split. No TLS, no DNS.
+//! HTTP/1.0 URL and header split. No TLS.
 
 use alloc::string::String;
 
+pub enum Host {
+    V4([u8; 4]),
+    Name(String),
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Scheme {
+    Http,
+    Https,
+}
+
 pub struct Url {
-    pub host: [u8; 4],
+    pub scheme: Scheme,
+    pub host: Host,
     pub port: u16,
     pub path: String,
 }
 
 pub enum UrlError {
     Bad,
-    Https,
 }
 
 pub struct HttpHead {
@@ -18,10 +29,13 @@ pub struct HttpHead {
 }
 
 pub fn parse_url(s: &str) -> Result<Url, UrlError> {
-    if s.starts_with("https://") {
-        return Err(UrlError::Https);
-    }
-    let rest = s.strip_prefix("http://").ok_or(UrlError::Bad)?;
+    let (scheme, default_port, rest) = if let Some(r) = s.strip_prefix("http://") {
+        (Scheme::Http, 80, r)
+    } else if let Some(r) = s.strip_prefix("https://") {
+        (Scheme::Https, 443, r)
+    } else {
+        return Err(UrlError::Bad);
+    };
     if rest.is_empty() {
         return Err(UrlError::Bad);
     }
@@ -40,16 +54,23 @@ pub fn parse_url(s: &str) -> Result<Url, UrlError> {
             }
             (h, port)
         }
-        None => (authority, 80),
+        None => (authority, default_port),
     };
-    let addr = crate::net::parse_ipv4(host).ok_or(UrlError::Bad)?;
+    let host = if let Some(addr) = crate::net::parse_ipv4(host) {
+        Host::V4(addr.octets())
+    } else if crate::net::is_hostname(host) {
+        Host::Name(String::from(host))
+    } else {
+        return Err(UrlError::Bad);
+    };
     let path = if path.is_empty() {
         String::from("/")
     } else {
         String::from(path)
     };
     Ok(Url {
-        host: addr.octets(),
+        scheme,
+        host,
         port,
         path,
     })

@@ -162,9 +162,7 @@ pub(super) fn probe_all() -> [Option<Host>; MAX_HC] {
     let mut root = PciRoot::new(CamCf8);
     for bus in 0u8..=255 {
         for (df, info) in root.enumerate_bus(bus) {
-            if info.class != CLASS_USB
-                || info.subclass != SUBCLASS_USB
-                || info.prog_if != PROG_XHCI
+            if info.class != CLASS_USB || info.subclass != SUBCLASS_USB || info.prog_if != PROG_XHCI
             {
                 continue;
             }
@@ -569,12 +567,7 @@ pub(super) fn write_ctx(base: VirtAddr, sz: usize, idx: u8, dw: usize, val: u32)
 
 pub(super) fn read_ctx(base: VirtAddr, sz: usize, idx: u8, dw: usize) -> u32 {
     let off = idx as usize * sz + dw * 4;
-    unsafe {
-        base.as_ptr::<u8>()
-            .add(off)
-            .cast::<u32>()
-            .read_volatile()
-    }
+    unsafe { base.as_ptr::<u8>().add(off).cast::<u32>().read_volatile() }
 }
 
 pub(super) fn page() -> Option<Page> {
@@ -617,7 +610,9 @@ fn read8(base: VirtAddr, off: u32) -> u8 {
 
 fn write8(base: VirtAddr, off: u32, val: u8) {
     unsafe {
-        base.as_mut_ptr::<u8>().add(off as usize).write_volatile(val);
+        base.as_mut_ptr::<u8>()
+            .add(off as usize)
+            .write_volatile(val);
     }
 }
 

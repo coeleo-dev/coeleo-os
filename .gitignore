@@ -18,6 +18,8 @@ target/
 /userspace/apps/sh/sh
 /userspace/apps/ls/ls
 /userspace/apps/cat/cat
+/userspace/apps/echo/echo
+/userspace/apps/edit/edit
 /userspace/apps/clock/clock
 /userspace/apps/spin/spin
 /userspace/apps/winprobe/winprobe
@@ -33,12 +35,11 @@ __pycache__/
 *.rs.bk
 .env
 
-docs/fonts
-docs/image
-docs/old
-docs/prompts
-docs/requirements
-docs/roadmap-pos-fase-15.md
+# Specs, fonts, images, old plans. Contribution sheets stay tracked.
+/docs/*
+!/docs/contrib/
+!/docs/contrib/**
+
 disk-seed
 # Cursor IDE (local). Tracked files stay tracked until `git rm -r --cached .cursor`.
 /.cursor/

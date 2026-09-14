@@ -24,6 +24,8 @@ pub const SYS_REBOOT: u64 = 21;
 pub const SYS_POWEROFF: u64 = 22;
 pub const SYS_DISKS: u64 = 23;
 pub const SYS_INSTALL: u64 = 24;
+pub const SYS_PIPE: u64 = 25;
+pub const SYS_MKDIR: u64 = 26;
 
 pub const OPEN_READ: u64 = 1;
 pub const OPEN_WRITE: u64 = 2;
@@ -43,11 +45,30 @@ pub const ERR_NO_NET: u64 = u64::MAX - 1;
 pub const ERR_TIMEOUT: u64 = u64::MAX - 2;
 pub const ERR_HTTPS: u64 = u64::MAX - 3;
 pub const ERR_BAD_URL: u64 = u64::MAX - 4;
+pub const SPAWN_FD_DEFAULT: u64 = u64::MAX;
 
 #[repr(C)]
 struct HttpGetArgs {
     url_ptr: u64,
     url_len: u64,
+    buf_ptr: u64,
+    buf_len: u64,
+}
+
+#[repr(C)]
+struct SpawnArgs {
+    path_ptr: u64,
+    path_len: u64,
+    argv_ptr: u64,
+    argv_len: u64,
+    stdin_fd: u64,
+    stdout_fd: u64,
+}
+
+#[repr(C)]
+struct PingArgs {
+    name_ptr: u64,
+    name_len: u64,
     buf_ptr: u64,
     buf_len: u64,
 }
@@ -73,7 +94,23 @@ pub fn readdir(fd: u64, buf: &mut [u8; DIRENT_SIZE]) -> u64 {
 }
 
 pub fn spawn(path: &str) -> u64 {
-    syscall2(SYS_SPAWN, path.as_ptr() as u64, path.len() as u64)
+    spawn_ex(path, &[], SPAWN_FD_DEFAULT, SPAWN_FD_DEFAULT)
+}
+
+pub fn spawn_ex(path: &str, argv: &[u8], stdin_fd: u64, stdout_fd: u64) -> u64 {
+    let args = SpawnArgs {
+        path_ptr: path.as_ptr() as u64,
+        path_len: path.len() as u64,
+        argv_ptr: argv.as_ptr() as u64,
+        argv_len: argv.len() as u64,
+        stdin_fd,
+        stdout_fd,
+    };
+    syscall1(SYS_SPAWN, &args as *const SpawnArgs as u64)
+}
+
+pub fn pipe(fds: &mut [u32; 2]) -> u64 {
+    syscall1(SYS_PIPE, fds.as_mut_ptr() as u64)
 }
 
 pub fn wait() -> u64 {
@@ -94,6 +131,10 @@ pub fn ps(buf: &mut [u8]) -> u64 {
 
 pub fn unlink(path: &str) -> u64 {
     syscall2(SYS_UNLINK, path.as_ptr() as u64, path.len() as u64)
+}
+
+pub fn mkdir(path: &str) -> u64 {
+    syscall2(SYS_MKDIR, path.as_ptr() as u64, path.len() as u64)
 }
 
 pub fn sync() -> u64 {
@@ -124,14 +165,14 @@ pub fn install(index: u64) -> u64 {
     syscall1(SYS_INSTALL, index)
 }
 
-pub fn net_ping(octets: [u8; 4], buf: &mut [u8]) -> u64 {
-    let packed = u32::from_le_bytes(octets) as u64;
-    syscall3(
-        SYS_NET_PING,
-        packed,
-        buf.as_mut_ptr() as u64,
-        buf.len() as u64,
-    )
+pub fn net_ping(name: &str, buf: &mut [u8]) -> u64 {
+    let args = PingArgs {
+        name_ptr: name.as_ptr() as u64,
+        name_len: name.len() as u64,
+        buf_ptr: buf.as_mut_ptr() as u64,
+        buf_len: buf.len() as u64,
+    };
+    syscall1(SYS_NET_PING, &args as *const PingArgs as u64)
 }
 
 pub fn http_get(url: &str, buf: &mut [u8]) -> u64 {

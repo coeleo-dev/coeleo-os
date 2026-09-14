@@ -17,6 +17,12 @@ pub const PAD: u32 = 8;
 pub const GAP: u32 = 8;
 pub const RADIUS: u32 = 6;
 pub const RADIUS_SM: u32 = 4;
+/// Window min/max/close control (not the full title-bar height).
+pub const DECO_BTN: u32 = 24;
+/// Vertical inset so deco hover sits below the 3 px focus strip.
+pub const DECO_BTN_PAD: u32 = 4;
+/// Compact Yaru-style push button / icon button.
+pub const BUTTON_H: u32 = 24;
 pub const TASK_ICON: u32 = 36;
 pub const SHADOW_OFF: u32 = 2;
 pub const SHADOW_A: [u8; 8] = [40, 28, 20, 14, 10, 6, 4, 2];

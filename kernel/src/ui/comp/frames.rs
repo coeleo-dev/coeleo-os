@@ -13,7 +13,7 @@ use super::paint::{
 };
 use super::rect::rect_union;
 use super::state::{
-    Drag, Edge, Focus, Frame, FrameKind, Hit, State, BTN, CLIENT_TOP, FOCUS_DESK, FOCUS_FILES,
+    BTN, CLIENT_TOP, Drag, Edge, FOCUS_DESK, FOCUS_FILES, Focus, Frame, FrameKind, Hit, State,
 };
 use core::sync::atomic::Ordering;
 

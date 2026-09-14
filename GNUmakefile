@@ -16,6 +16,7 @@ override DISK_IMG := disk.img
 override DISK_MIB := 64
 override VIRTIO_BLK := -drive file=$(DISK_IMG),if=none,format=raw,id=vd0,cache=writethrough -device virtio-blk-pci,drive=vd0,bootindex=2
 override VIRTIO_NET := -nic user,model=virtio-net-pci
+override E1000E_NET := -nic user,model=e1000e
 override USB_MOUSE := -device piix3-usb-uhci,id=uhci -device usb-mouse,bus=uhci.0
 override AHCI_IMG := disk-ahci.img
 $(call USER_VARIABLE,USB_DEV,)
@@ -37,6 +38,17 @@ run-uefi: edk2-ovmf $(IMAGE_NAME).iso ensure-fat32-disk
 		-cdrom $(IMAGE_NAME).iso \
 		$(VIRTIO_BLK) \
 		$(VIRTIO_NET) \
+		$(USB_MOUSE) \
+		$(QEMUFLAGS)
+
+.PHONY: run-e1000e
+run-e1000e: edk2-ovmf $(IMAGE_NAME).iso ensure-fat32-disk
+	qemu-system-x86_64 \
+		-M q35 \
+		-drive if=pflash,unit=0,format=raw,file=edk2-ovmf/ovmf-code-x86_64.fd,readonly=on \
+		-cdrom $(IMAGE_NAME).iso \
+		$(VIRTIO_BLK) \
+		$(E1000E_NET) \
 		$(USB_MOUSE) \
 		$(QEMUFLAGS)
 
@@ -200,6 +212,8 @@ $(DISK_IMG): userspace
 	MTOOLS_SKIP_CHECK=1 mcopy -i $@ userspace/apps/sh/sh ::sh
 	MTOOLS_SKIP_CHECK=1 mcopy -i $@ userspace/apps/ls/ls ::ls
 	MTOOLS_SKIP_CHECK=1 mcopy -i $@ userspace/apps/cat/cat ::cat
+	MTOOLS_SKIP_CHECK=1 mcopy -i $@ userspace/apps/echo/echo ::echo
+	MTOOLS_SKIP_CHECK=1 mcopy -i $@ userspace/apps/edit/edit ::edit
 	MTOOLS_SKIP_CHECK=1 mcopy -i $@ userspace/apps/clock/clock ::clock
 	MTOOLS_SKIP_CHECK=1 mcopy -i $@ userspace/apps/spin/spin ::spin
 	MTOOLS_SKIP_CHECK=1 mcopy -i $@ userspace/apps/winprobe/winprobe ::winprobe
@@ -219,6 +233,8 @@ ensure-fat32-disk: userspace
 		&& MTOOLS_SKIP_CHECK=1 mcopy -o -i $(DISK_IMG) userspace/apps/sh/sh ::sh \
 		&& MTOOLS_SKIP_CHECK=1 mcopy -o -i $(DISK_IMG) userspace/apps/ls/ls ::ls \
 		&& MTOOLS_SKIP_CHECK=1 mcopy -o -i $(DISK_IMG) userspace/apps/cat/cat ::cat \
+		&& MTOOLS_SKIP_CHECK=1 mcopy -o -i $(DISK_IMG) userspace/apps/echo/echo ::echo \
+		&& MTOOLS_SKIP_CHECK=1 mcopy -o -i $(DISK_IMG) userspace/apps/edit/edit ::edit \
 		&& MTOOLS_SKIP_CHECK=1 mcopy -o -i $(DISK_IMG) userspace/apps/clock/clock ::clock \
 		&& MTOOLS_SKIP_CHECK=1 mcopy -o -i $(DISK_IMG) userspace/apps/spin/spin ::spin \
 		&& MTOOLS_SKIP_CHECK=1 mcopy -o -i $(DISK_IMG) userspace/apps/winprobe/winprobe ::winprobe \
@@ -250,6 +266,8 @@ $(AHCI_IMG): userspace kernel
 	MTOOLS_SKIP_CHECK=1 mcopy -i $@@@1M userspace/apps/sh/sh ::sh
 	MTOOLS_SKIP_CHECK=1 mcopy -i $@@@1M userspace/apps/ls/ls ::ls
 	MTOOLS_SKIP_CHECK=1 mcopy -i $@@@1M userspace/apps/cat/cat ::cat
+	MTOOLS_SKIP_CHECK=1 mcopy -i $@@@1M userspace/apps/echo/echo ::echo
+	MTOOLS_SKIP_CHECK=1 mcopy -i $@@@1M userspace/apps/edit/edit ::edit
 	MTOOLS_SKIP_CHECK=1 mcopy -i $@@@1M userspace/apps/clock/clock ::clock
 	MTOOLS_SKIP_CHECK=1 mcopy -i $@@@1M userspace/apps/spin/spin ::spin
 	MTOOLS_SKIP_CHECK=1 mcopy -i $@@@1M userspace/apps/winprobe/winprobe ::winprobe
@@ -270,6 +288,8 @@ ensure-ahci-disk: userspace kernel
 		&& MTOOLS_SKIP_CHECK=1 mcopy -o -i $(AHCI_IMG)@@1M userspace/apps/sh/sh ::sh \
 		&& MTOOLS_SKIP_CHECK=1 mcopy -o -i $(AHCI_IMG)@@1M userspace/apps/ls/ls ::ls \
 		&& MTOOLS_SKIP_CHECK=1 mcopy -o -i $(AHCI_IMG)@@1M userspace/apps/cat/cat ::cat \
+		&& MTOOLS_SKIP_CHECK=1 mcopy -o -i $(AHCI_IMG)@@1M userspace/apps/echo/echo ::echo \
+		&& MTOOLS_SKIP_CHECK=1 mcopy -o -i $(AHCI_IMG)@@1M userspace/apps/edit/edit ::edit \
 		&& MTOOLS_SKIP_CHECK=1 mcopy -o -i $(AHCI_IMG)@@1M userspace/apps/clock/clock ::clock \
 		&& MTOOLS_SKIP_CHECK=1 mcopy -o -i $(AHCI_IMG)@@1M userspace/apps/spin/spin ::spin \
 		&& MTOOLS_SKIP_CHECK=1 mcopy -o -i $(AHCI_IMG)@@1M userspace/apps/winprobe/winprobe ::winprobe \
@@ -354,6 +374,22 @@ test-phase9: $(IMAGE_NAME).iso userspace
 test-phase10: $(IMAGE_NAME).iso userspace
 	python3 scripts/test-phase10.py $(IMAGE_NAME).iso userspace/apps/sh/sh userspace/apps/clock/clock userspace/apps/spin/spin userspace/apps/hello/hello
 
+.PHONY: test-phase20
+test-phase20: $(IMAGE_NAME).iso userspace
+	python3 scripts/test-phase20.py $(IMAGE_NAME).iso userspace/apps/sh/sh userspace/apps/hello/hello userspace/apps/cat/cat
+
+.PHONY: test-phase20b
+test-phase20b: $(IMAGE_NAME).iso userspace
+	python3 scripts/test-phase20b.py $(IMAGE_NAME).iso userspace/apps/sh/sh userspace/apps/hello/hello
+
+.PHONY: test-phase20c
+test-phase20c: $(IMAGE_NAME).iso userspace
+	python3 scripts/test-phase20c.py $(IMAGE_NAME).iso userspace/apps/sh/sh userspace/apps/echo/echo userspace/apps/cat/cat
+
+.PHONY: test-phase21
+test-phase21: $(IMAGE_NAME).iso userspace
+	python3 scripts/test-phase21.py $(IMAGE_NAME).iso userspace/apps/sh/sh userspace/apps/edit/edit userspace/apps/cat/cat userspace/libs/pkg/hello.coe
+
 .PHONY: test-phase11
 test-phase11: $(IMAGE_NAME).iso userspace
 	python3 scripts/test-phase11.py $(IMAGE_NAME).iso userspace/apps/sh/sh
@@ -361,6 +397,14 @@ test-phase11: $(IMAGE_NAME).iso userspace
 .PHONY: test-phase12
 test-phase12: $(IMAGE_NAME).iso userspace
 	python3 scripts/test-phase12.py $(IMAGE_NAME).iso userspace/apps/sh/sh
+
+.PHONY: test-phase18
+test-phase18: $(IMAGE_NAME).iso userspace
+	python3 scripts/test-phase18.py $(IMAGE_NAME).iso userspace/apps/sh/sh
+
+.PHONY: test-phase19
+test-phase19: $(IMAGE_NAME).iso userspace
+	python3 scripts/test-phase19.py $(IMAGE_NAME).iso userspace/apps/sh/sh
 
 .PHONY: test-phase13
 test-phase13: $(IMAGE_NAME).iso userspace
@@ -425,6 +469,10 @@ test-phase17: $(IMAGE_NAME).iso userspace edk2-ovmf
 .PHONY: test-phase17-usb
 test-phase17-usb: $(IMAGE_NAME).iso userspace edk2-ovmf
 	python3 scripts/test-phase17-usb.py $(IMAGE_NAME).iso
+
+.PHONY: test-phase22
+test-phase22: $(IMAGE_NAME).iso userspace
+	python3 scripts/test-phase22.py $(IMAGE_NAME).iso userspace/apps/sh/sh userspace/libs/pkg/hello.coe userspace/libs/pkg/bad.coe
 
 .PHONY: test-phase25
 test-phase25: $(IMAGE_NAME).iso

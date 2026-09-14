@@ -6,9 +6,7 @@ use coeleo_draw::{self, Clip, Icon};
 use coeleo_theme::RADIUS;
 
 use super::fb::{blend, fill_span, get_fb, put_fb, tgt};
-use super::rect::{
-    rect_contains, rect_intersect, rect_is_empty, rect_sub, Rect,
-};
+use super::rect::{Rect, rect_contains, rect_intersect, rect_is_empty, rect_sub};
 
 pub(super) struct FilesSink {
     pub(super) fb: FbInfo,
@@ -165,6 +163,92 @@ impl fm::Draw for FilesSink {
         let iy = self.oy.saturating_add(y);
         self.with_clips(|c| {
             coeleo_draw::icon(t, which, ix, iy, color, c);
+        });
+    }
+
+    fn icon_btn(&mut self, x: u32, y: u32, which: Icon, hovered: bool, enabled: bool) {
+        let t = tgt(self.fb);
+        let sx = self.ox.saturating_add(x);
+        let sy = self.oy.saturating_add(y);
+        self.with_clips(|c| {
+            coeleo_draw::icon_btn(t, sx, sy, which, hovered, false, enabled, None, c);
+        });
+    }
+
+    fn query_field(
+        &mut self,
+        x: u32,
+        y: u32,
+        w: u32,
+        h: u32,
+        text: &str,
+        placeholder: &str,
+        caret: bool,
+        search_icon: bool,
+    ) {
+        let t = tgt(self.fb);
+        let sx = self.ox.saturating_add(x);
+        let sy = self.oy.saturating_add(y);
+        self.with_clips(|c| {
+            coeleo_draw::query_field(t, sx, sy, w, h, text, placeholder, caret, search_icon, c);
+        });
+    }
+
+    fn crumb(&mut self, x: u32, y: u32, h: u32, label: &str, hovered: bool) -> u32 {
+        let t = tgt(self.fb);
+        let sx = self.ox.saturating_add(x);
+        let sy = self.oy.saturating_add(y);
+        let mut w = 0u32;
+        self.with_clips(|c| {
+            w = coeleo_draw::crumb(t, sx, sy, h, label, hovered, c);
+        });
+        if w == 0 {
+            coeleo_draw::crumb_width(label)
+        } else {
+            w
+        }
+    }
+
+    fn crumb_sep(&mut self, x: u32, y: u32, h: u32) -> u32 {
+        let t = tgt(self.fb);
+        let sx = self.ox.saturating_add(x);
+        let sy = self.oy.saturating_add(y);
+        let mut w = 0u32;
+        self.with_clips(|c| {
+            w = coeleo_draw::crumb_sep(t, sx, sy, h, c);
+        });
+        if w == 0 {
+            coeleo_draw::text_width(">").saturating_add(coeleo_theme::GAP / 2)
+        } else {
+            w
+        }
+    }
+
+    fn vsep(&mut self, x: u32, y: u32, h: u32) {
+        let t = tgt(self.fb);
+        let sx = self.ox.saturating_add(x);
+        let sy = self.oy.saturating_add(y);
+        self.with_clips(|c| {
+            coeleo_draw::vsep(t, sx, sy, h, c);
+        });
+    }
+
+    fn list_row(
+        &mut self,
+        x: u32,
+        y: u32,
+        w: u32,
+        h: u32,
+        label: &str,
+        icon: Option<Icon>,
+        selected: bool,
+        hovered: bool,
+    ) {
+        let t = tgt(self.fb);
+        let sx = self.ox.saturating_add(x);
+        let sy = self.oy.saturating_add(y);
+        self.with_clips(|c| {
+            coeleo_draw::list_row(t, sx, sy, w, h, label, icon, selected, hovered, c);
         });
     }
 }

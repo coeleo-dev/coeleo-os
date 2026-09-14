@@ -115,6 +115,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "echo"
+version = "0.1.0"
+dependencies = [
+ "libcoeleo",
+]
+
+[[package]]
 name = "ed25519"
 version = "2.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -134,6 +141,13 @@ dependencies = [
  "sha2",
  "subtle",
  "zeroize",
+]
+
+[[package]]
+name = "edit"
+version = "0.1.0"
+dependencies = [
+ "libcoeleo",
 ]
 
 [[package]]

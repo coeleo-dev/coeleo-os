@@ -1,8 +1,8 @@
 //! One-level USB hub: power/reset children, Address Device with route string.
 
+use super::Setup;
 use super::host::{self, Host, Kind};
 use super::slot;
-use super::Setup;
 
 const MAX_HUB_PORTS: u8 = 8;
 const FEAT_PORT_RESET: u16 = 4;

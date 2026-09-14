@@ -35,6 +35,10 @@ enum OpenFd {
         index: usize,
         ents: Vec<DirEnt>,
     },
+    Pipe {
+        id: u8,
+        write: bool,
+    },
 }
 
 pub struct FdTable {
@@ -70,6 +74,80 @@ impl FdTable {
             }
         }
         ERR
+    }
+
+    fn replace(&mut self, fd: u64, of: OpenFd) {
+        if let Some(old) = self.take(fd) {
+            drop_open(old);
+        }
+        let Some(i) = usize::try_from(fd).ok() else {
+            drop_open(of);
+            return;
+        };
+        if i >= FD_MAX {
+            drop_open(of);
+            return;
+        }
+        self.slots[i] = Some(of);
+    }
+
+    fn clone_slot(&self, fd: u64) -> Option<OpenFd> {
+        let i = usize::try_from(fd).ok()?;
+        let of = self.slots.get(i)?.as_ref()?;
+        match of {
+            OpenFd::Stdin => Some(OpenFd::Stdin),
+            OpenFd::Stdout => Some(OpenFd::Stdout),
+            OpenFd::Stderr => Some(OpenFd::Stderr),
+            OpenFd::File {
+                path,
+                offset,
+                writable,
+            } => Some(OpenFd::File {
+                path: path.clone(),
+                offset: *offset,
+                writable: *writable,
+            }),
+            OpenFd::Dir { .. } => None,
+            OpenFd::Pipe { id, write } => {
+                crate::pipe::clone_end(*id, *write).ok()?;
+                Some(OpenFd::Pipe {
+                    id: *id,
+                    write: *write,
+                })
+            }
+        }
+    }
+
+    pub fn inherit_from(&self, stdin_fd: u64, stdout_fd: u64) -> Option<Self> {
+        let mut t = Self::new_stdio();
+        if stdin_fd != u64::MAX {
+            let of = self.clone_slot(stdin_fd)?;
+            t.replace(0, of);
+        }
+        if stdout_fd != u64::MAX {
+            match self.clone_slot(stdout_fd) {
+                Some(of) => t.replace(1, of),
+                None => {
+                    t.close_all();
+                    return None;
+                }
+            }
+        }
+        Some(t)
+    }
+
+    pub fn close_all(&mut self) {
+        for slot in &mut self.slots {
+            if let Some(of) = slot.take() {
+                drop_open(of);
+            }
+        }
+    }
+}
+
+fn drop_open(of: OpenFd) {
+    if let OpenFd::Pipe { id, write } = of {
+        crate::pipe::drop_end(id, write);
     }
 }
 
@@ -123,15 +201,35 @@ fn open_file(path: String, writable: bool) -> u64 {
     })
 }
 
+enum ReadKind {
+    Stdin,
+    File,
+    Pipe(u8),
+}
+
 pub fn sys_read(fd: u64, buf: u64, len: u64) -> u64 {
     if len > IO_MAX as u64 {
         return ERR;
     }
     let n = len as usize;
-    if fd == 0 {
-        return read_stdin(buf, n);
+    let kind = match with_fds(|t| match t.get_mut(fd) {
+        Some(OpenFd::Stdin) => Some(ReadKind::Stdin),
+        Some(OpenFd::File { .. }) => Some(ReadKind::File),
+        Some(OpenFd::Pipe { id, write: false }) => Some(ReadKind::Pipe(*id)),
+        _ => None,
+    }) {
+        Some(Some(k)) => k,
+        _ => return ERR,
+    };
+    match kind {
+        ReadKind::Stdin => read_stdin(buf, n),
+        ReadKind::File => read_file(fd, buf, n),
+        ReadKind::Pipe(id) => read_pipe(id, buf, n),
     }
-    if n > 0 && !crate::vmm::user_slice_ok(buf, len) {
+}
+
+fn read_file(fd: u64, buf: u64, n: usize) -> u64 {
+    if n > 0 && !crate::vmm::user_slice_ok(buf, n as u64) {
         return ERR;
     }
     let (path, offset) = {
@@ -168,6 +266,34 @@ pub fn sys_read(fd: u64, buf: u64, len: u64) -> u64 {
     }
 }
 
+fn read_pipe(id: u8, buf: u64, n: usize) -> u64 {
+    if n == 0 {
+        return 0;
+    }
+    if !crate::vmm::user_slice_ok(buf, n as u64) {
+        return ERR;
+    }
+    loop {
+        let mut io = IO_BUF.lock();
+        match crate::pipe::read(id, &mut io[..n]) {
+            crate::pipe::Read::Data(got) => {
+                if copy_to_user(buf, &io[..got]).is_err() {
+                    return ERR;
+                }
+                drop(io);
+                crate::sched::wake_pipe();
+                return got as u64;
+            }
+            crate::pipe::Read::Eof => return 0,
+            crate::pipe::Read::WouldBlock => {
+                drop(io);
+                crate::sched::wake_pipe();
+                crate::sched::block_pipe_read();
+            }
+        }
+    }
+}
+
 fn read_stdin(buf: u64, len: usize) -> u64 {
     if len == 0 {
         return 0;
@@ -197,6 +323,12 @@ fn read_stdin(buf: u64, len: usize) -> u64 {
     }
 }
 
+enum WriteKind {
+    Console,
+    File,
+    Pipe(u8),
+}
+
 pub fn sys_write(fd: u64, buf: u64, len: u64) -> u64 {
     if len > IO_MAX as u64 {
         return ERR;
@@ -205,43 +337,88 @@ pub fn sys_write(fd: u64, buf: u64, len: u64) -> u64 {
         return ERR;
     }
     let n = len as usize;
+    let kind = match with_fds(|t| match t.get_mut(fd) {
+        Some(OpenFd::Stdout | OpenFd::Stderr) => Some(WriteKind::Console),
+        Some(OpenFd::File { writable: true, .. }) => Some(WriteKind::File),
+        Some(OpenFd::Pipe { id, write: true }) => Some(WriteKind::Pipe(*id)),
+        _ => None,
+    }) {
+        Some(Some(k)) => k,
+        _ => return ERR,
+    };
+    match kind {
+        WriteKind::Console => write_console(buf, n),
+        WriteKind::File => write_file(fd, buf, n),
+        WriteKind::Pipe(id) => write_pipe(id, buf, n),
+    }
+}
+
+fn write_console(buf: u64, n: usize) -> u64 {
     let mut io = IO_BUF.lock();
     if copy_from_user(buf, n, &mut io[..]).is_err() {
         return ERR;
     }
-    match fd {
-        1 | 2 => match core::str::from_utf8(&io[..n]) {
-            Ok(s) => {
-                crate::console::write(s);
-                len
+    match core::str::from_utf8(&io[..n]) {
+        Ok(s) => {
+            crate::console::write(s);
+            n as u64
+        }
+        Err(_) => ERR,
+    }
+}
+
+fn write_file(fd: u64, buf: u64, n: usize) -> u64 {
+    let mut io = IO_BUF.lock();
+    if copy_from_user(buf, n, &mut io[..]).is_err() {
+        return ERR;
+    }
+    let (path, offset) = {
+        match with_fds(|t| match t.get_mut(fd) {
+            Some(OpenFd::File {
+                path,
+                offset,
+                writable: true,
+            }) => Some((path.clone(), *offset)),
+            _ => None,
+        }) {
+            Some(Some(v)) => v,
+            _ => return ERR,
+        }
+    };
+    match fs::write_at(&path, offset, &io[..n]) {
+        Ok(got) => {
+            drop(io);
+            let _ = with_fds(|t| {
+                if let Some(OpenFd::File { offset: o, .. }) = t.get_mut(fd) {
+                    *o = offset + got as u64;
+                }
+            });
+            got as u64
+        }
+        Err(_) => ERR,
+    }
+}
+
+fn write_pipe(id: u8, buf: u64, n: usize) -> u64 {
+    if n == 0 {
+        return 0;
+    }
+    loop {
+        let mut io = IO_BUF.lock();
+        if copy_from_user(buf, n, &mut io[..]).is_err() {
+            return ERR;
+        }
+        match crate::pipe::write(id, &io[..n]) {
+            crate::pipe::Write::Data(got) => {
+                drop(io);
+                crate::sched::wake_pipe();
+                return got as u64;
             }
-            Err(_) => ERR,
-        },
-        _ => {
-            let (path, offset) = {
-                match with_fds(|t| match t.get_mut(fd) {
-                    Some(OpenFd::File {
-                        path,
-                        offset,
-                        writable: true,
-                    }) => Some((path.clone(), *offset)),
-                    _ => None,
-                }) {
-                    Some(Some(v)) => v,
-                    _ => return ERR,
-                }
-            };
-            match fs::write_at(&path, offset, &io[..n]) {
-                Ok(got) => {
-                    drop(io);
-                    let _ = with_fds(|t| {
-                        if let Some(OpenFd::File { offset: o, .. }) = t.get_mut(fd) {
-                            *o = offset + got as u64;
-                        }
-                    });
-                    got as u64
-                }
-                Err(_) => ERR,
+            crate::pipe::Write::Broken => return ERR,
+            crate::pipe::Write::WouldBlock => {
+                drop(io);
+                crate::sched::wake_pipe();
+                crate::sched::block_pipe_write();
             }
         }
     }
@@ -252,8 +429,57 @@ pub fn sys_close(fd: u64) -> u64 {
         return ERR;
     }
     match with_fds(|t| t.take(fd)) {
-        Some(Some(_)) => 0,
+        Some(Some(of)) => {
+            drop_open(of);
+            crate::sched::wake_pipe();
+            0
+        }
         _ => ERR,
+    }
+}
+
+pub fn sys_pipe(buf: u64) -> u64 {
+    if !crate::vmm::user_slice_ok(buf, 8) {
+        return ERR;
+    }
+    let Some(id) = crate::pipe::alloc() else {
+        return ERR;
+    };
+    let pair = with_fds(|t| {
+        let r = t.alloc(OpenFd::Pipe { id, write: false });
+        if r == ERR {
+            return None;
+        }
+        let w = t.alloc(OpenFd::Pipe { id, write: true });
+        if w == ERR {
+            let _ = t.take(r);
+            return None;
+        }
+        Some((r as u32, w as u32))
+    });
+    match pair {
+        Some(Some((r, w))) => {
+            let mut raw = [0u8; 8];
+            raw[..4].copy_from_slice(&r.to_le_bytes());
+            raw[4..].copy_from_slice(&w.to_le_bytes());
+            if copy_to_user(buf, &raw).is_err() {
+                let _ = with_fds(|t| {
+                    if let Some(of) = t.take(r as u64) {
+                        drop_open(of);
+                    }
+                    if let Some(of) = t.take(w as u64) {
+                        drop_open(of);
+                    }
+                });
+                return ERR;
+            }
+            0
+        }
+        _ => {
+            crate::pipe::drop_end(id, false);
+            crate::pipe::drop_end(id, true);
+            ERR
+        }
     }
 }
 
@@ -296,6 +522,16 @@ pub fn sys_unlink(path_ptr: u64, path_len: u64) -> u64 {
         return ERR;
     };
     match fs::remove(&path) {
+        Ok(()) => 0,
+        Err(_) => ERR,
+    }
+}
+
+pub fn sys_mkdir(path_ptr: u64, path_len: u64) -> u64 {
+    let Some(path) = copy_path(path_ptr, path_len) else {
+        return ERR;
+    };
+    match fs::mkdir(&path) {
         Ok(()) => 0,
         Err(_) => ERR,
     }

@@ -26,11 +26,11 @@ pub(crate) use bus::{pci, xhci};
 pub(crate) use fs::{ahci, blk, fat_disk, gpt, install, part, usb_msc};
 pub(crate) use input::{kbd, mouse, ps2, uhci, usb_hid};
 pub(crate) use mem::{heap, pmm, vmm};
-pub(crate) use net::{http, virtio_hal, virtio_net, virtio_pci};
-pub(crate) use task::{elfload, fd, process, sched, syscall};
-pub(crate) use ui::{clock, comp, desk, deskset, fbterm, fm, krunner, panel, splash, win};
+pub(crate) use net::{e1000e, http, virtio_hal, virtio_net, virtio_pci};
+pub(crate) use task::{elfload, fd, pipe, process, sched, syscall};
 #[allow(unused_imports)]
 pub(crate) use ui::font8x16;
+pub(crate) use ui::{clock, comp, desk, deskset, fbterm, fm, krunner, panel, splash, win};
 
 /// Sets the base revision to the latest revision supported by the crate.
 /// See specification for further info.

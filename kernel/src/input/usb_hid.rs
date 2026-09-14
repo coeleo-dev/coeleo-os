@@ -325,6 +325,7 @@ fn map_usage(usage: u8, mods: u8) -> Option<Key> {
         0x28 => Some(Key::Enter),
         0x29 => Some(Key::Esc),
         0x2A => Some(Key::Backspace),
+        0x4C => Some(Key::Delete),
         0x2B => Some(Key::Tab),
         0x2C => Some(Key::Char(b' ')),
         0x4F => Some(Key::Right),

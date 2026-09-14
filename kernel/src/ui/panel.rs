@@ -166,13 +166,7 @@ pub fn paint(
     let kx = sx0 + SLOT;
     slot_bg(t, kx, iy0, Hit::KRunner, hover, pressed, clip);
     coeleo_draw::icon(t, Icon::Search, kx + ioff, iy, TEXT, clip);
-    coeleo_draw::vsep(
-        t,
-        sx0 + SLOT * 2,
-        iy0 + 2,
-        sh.saturating_sub(4),
-        clip,
-    );
+    coeleo_draw::vsep(t, sx0 + SLOT * 2, iy0 + 2, sh.saturating_sub(4), clip);
     let clock_w = clock_w(clock_mmss);
     let cx = x1.saturating_sub(PAD + clock_w);
     let mut sx = sx0 + SLOT * 2;
@@ -356,14 +350,13 @@ fn tip_geom(
     }
     let y = y0.saturating_sub(h.saturating_add(TIP_GAP));
     let close = if with_close {
+        let cx = x.saturating_add(w).saturating_sub(coeleo_draw::ICON + 2);
+        let cy = y + (h.saturating_sub(coeleo_draw::ICON)) / 2;
         Clip {
-            x0: x.saturating_add(w).saturating_sub(14),
-            y0: y.saturating_add(PAD / 2),
-            x1: x
-                .saturating_add(w)
-                .saturating_sub(14)
-                .saturating_add(coeleo_draw::ICON),
-            y1: y.saturating_add(PAD / 2).saturating_add(coeleo_draw::ICON),
+            x0: cx,
+            y0: cy,
+            x1: cx.saturating_add(coeleo_draw::ICON),
+            y1: cy.saturating_add(coeleo_draw::ICON),
         }
     } else {
         Clip {
@@ -450,7 +443,7 @@ fn paint_pill(t: Target, sx: u32, y0: u32, task: &TaskInfo, clip: Clip) {
 }
 
 fn clock_w(clock_mmss: &str) -> u32 {
-    clock_mmss.len() as u32 * coeleo_draw::FONT_W
+    coeleo_draw::text_width(clock_mmss)
 }
 
 fn wall_px(pix: &[u32], ww: u32, wh: u32, x: u32, y: u32, fb_w: u32) -> u32 {

@@ -87,14 +87,25 @@ pub(super) fn blit_u32_at_round(
             if !y_edge && x >= wx.saturating_add(RADIUS) && x + RADIUS < wx1 {
                 let mid = (wx1.saturating_sub(RADIUS).saturating_sub(x)).min(w.saturating_sub(col));
                 if mid > 0 {
-                    blit_u32_at(fb, x, y, src, stride, sx.saturating_add(col), sy.saturating_add(row), mid, 1);
+                    blit_u32_at(
+                        fb,
+                        x,
+                        y,
+                        src,
+                        stride,
+                        sx.saturating_add(col),
+                        sy.saturating_add(row),
+                        mid,
+                        1,
+                    );
                     col = col.saturating_add(mid);
                     continue;
                 }
             }
             let cov = coeleo_draw::coverage_round(x, y, wx, wy, ww, wh, RADIUS);
             if cov > 0 {
-                let src_off = (sy.saturating_add(row).saturating_mul(stride) + sx.saturating_add(col)) as usize;
+                let src_off = (sy.saturating_add(row).saturating_mul(stride)
+                    + sx.saturating_add(col)) as usize;
                 if src_off < src.len() {
                     let color = src[src_off] & 0x00FF_FFFF;
                     if cov == 255 {

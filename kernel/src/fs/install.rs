@@ -16,7 +16,10 @@ const LABEL: [u8; 11] = *b"COELEO     ";
 const REQUIRED: &[(&str, &str)] = &[
     ("/boot/kernel", "boot/kernel"),
     ("/boot/limine/limine.conf", "boot/limine/limine.conf"),
-    ("/boot/limine/limine-bios.sys", "boot/limine/limine-bios.sys"),
+    (
+        "/boot/limine/limine-bios.sys",
+        "boot/limine/limine-bios.sys",
+    ),
     ("/EFI/BOOT/BOOTX64.EFI", "EFI/BOOT/BOOTX64.EFI"),
     ("/README.TXT", "README.TXT"),
     ("/docs/HELLO.TXT", "docs/HELLO.TXT"),
@@ -186,7 +189,9 @@ fn mkdir_p(fs: &FileSystem<FatDisk>, path: &str) -> Result<(), ()> {
 }
 
 fn parent_of(path: &str) -> Option<&str> {
-    path.rfind('/').map(|i| &path[..i]).filter(|p| !p.is_empty())
+    path.rfind('/')
+        .map(|i| &path[..i])
+        .filter(|p| !p.is_empty())
 }
 
 fn parse_index(s: &str) -> Option<usize> {

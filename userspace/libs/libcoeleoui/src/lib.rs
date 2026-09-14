@@ -18,6 +18,7 @@ pub const KEY_BACK: u8 = 5;
 pub const KEY_ESC: u8 = 6;
 pub const KEY_LEFT: u8 = 8;
 pub const KEY_RIGHT: u8 = 9;
+pub const KEY_DEL: u8 = 10;
 pub const ROW: u32 = coeleo_draw::ROW;
 
 pub struct Ui {
@@ -106,9 +107,12 @@ impl Ui {
         };
         coeleo_draw::fill_round(t, x, y, w, h, RADIUS_SM, bg, clip);
         let color = if enabled { fg } else { DIM };
-        let tw = (s.len() as u32).saturating_mul(coeleo_draw::FONT_W);
+        let tw = coeleo_draw::text_width(s);
         let tx = x.saturating_add(w.saturating_sub(tw) / 2);
-        let ty = y.saturating_add(h.saturating_sub(coeleo_draw::FONT_H) / 2);
+        let mut ty = y.saturating_add(h.saturating_sub(coeleo_draw::FONT_H) / 2);
+        if hit {
+            ty = ty.saturating_add(1);
+        }
         coeleo_draw::text(t, tx, ty, s, color, x.saturating_add(w), clip);
         if hit {
             self.mouse = None;
@@ -120,18 +124,39 @@ impl Ui {
     }
 
     pub fn icon_button(&mut self, x: u32, y: u32, which: Icon) -> bool {
-        let w = 24u32;
-        let h = 24u32;
+        self.icon_button_en(x, y, which, true)
+    }
+
+    pub fn icon_button_en(&mut self, x: u32, y: u32, which: Icon, enabled: bool) -> bool {
+        let w = coeleo_theme::BUTTON_H;
+        let h = coeleo_theme::BUTTON_H;
+        let hit = enabled && self.down_in(x, y, w, h);
+        let hover = enabled && self.pos_in(x, y, w, h);
+        coeleo_draw::icon_btn(
+            self.target(),
+            x,
+            y,
+            which,
+            hover,
+            hit,
+            enabled,
+            Some(SURFACE),
+            self.clip(),
+        );
+        if hit {
+            self.mouse = None;
+            self.dirty = true;
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn crumb(&mut self, x: u32, y: u32, h: u32, label: &str) -> bool {
+        let w = coeleo_draw::crumb_width(label);
         let hit = self.down_in(x, y, w, h);
         let hover = self.pos_in(x, y, w, h);
-        let t = self.target();
-        let clip = self.clip();
-        if hit {
-            coeleo_draw::highlight_fill(t, x, y, w, h, clip);
-        } else if hover {
-            coeleo_draw::hover_fill(t, x, y, w, h, clip);
-        }
-        coeleo_draw::icon(t, which, x + 4, y + 4, TEXT, clip);
+        let _ = coeleo_draw::crumb(self.target(), x, y, h, label, hover, self.clip());
         if hit {
             self.mouse = None;
             self.dirty = true;

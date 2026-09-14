@@ -2,7 +2,7 @@
 
 use super::damage::{flush_damage, flush_pending};
 use super::fb::put_fb_i;
-use super::rect::{rect_is_empty, RECT_EMPTY, Rect};
+use super::rect::{RECT_EMPTY, Rect, rect_is_empty};
 use super::state::State;
 
 use coeleo_theme::{SHADOW, TEXT};

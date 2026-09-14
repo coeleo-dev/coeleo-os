@@ -4,12 +4,12 @@ use core::sync::atomic::{Ordering, compiler_fence};
 
 use x86_64::{PhysAddr, VirtAddr};
 
-use super::host::{
-    self, CC_SHORT, CC_STALL, CC_SUCCESS, CH, CYCLE, DIR_IN, Host, IDT, IOC, IntEp, Kind, MAX_SLOTS,
-    Slot, TRB_ADDRESS, TRB_CONFIG_EP, TRB_DATA, TRB_DISABLE_SLOT, TRB_ENABLE_SLOT, TRB_EVAL,
-    TRB_NORMAL, TRB_SETUP, TRB_STATUS, TRT_IN, TRT_OUT,
-};
 use super::Setup;
+use super::host::{
+    self, CC_SHORT, CC_STALL, CC_SUCCESS, CH, CYCLE, DIR_IN, Host, IDT, IOC, IntEp, Kind,
+    MAX_SLOTS, Slot, TRB_ADDRESS, TRB_CONFIG_EP, TRB_DATA, TRB_DISABLE_SLOT, TRB_ENABLE_SLOT,
+    TRB_EVAL, TRB_NORMAL, TRB_SETUP, TRB_STATUS, TRT_IN, TRT_OUT,
+};
 use crate::pmm;
 
 pub(super) fn disable_slot(hc: &mut Host, slot: u8) {
@@ -366,12 +366,7 @@ pub(super) fn control_inner(
             );
         }
         let sdir = if has && inp { 0 } else { DIR_IN };
-        host::enqueue_ep(
-            &mut dev.ep0,
-            0,
-            0,
-            host::trb(CYCLE, TRB_STATUS, IOC | sdir),
-        );
+        host::enqueue_ep(&mut dev.ep0, 0, 0, host::trb(CYCLE, TRB_STATUS, IOC | sdir));
     }
     compiler_fence(Ordering::SeqCst);
     host::doorbell(hc, slot, 1);
@@ -411,7 +406,12 @@ pub(super) fn bounce_out(hc: &mut Host, slot: u8, buf: &[u8]) -> Result<(), ()> 
                 .bulk_out
                 .as_mut()
                 .ok_or(())?;
-            host::enqueue_ep(ring, bounce.as_u64(), n as u32, host::trb(CYCLE, TRB_NORMAL, IOC));
+            host::enqueue_ep(
+                ring,
+                bounce.as_u64(),
+                n as u32,
+                host::trb(CYCLE, TRB_NORMAL, IOC),
+            );
         }
         compiler_fence(Ordering::SeqCst);
         host::doorbell(hc, slot, dci);
@@ -440,7 +440,12 @@ pub(super) fn bounce_in(hc: &mut Host, slot: u8, buf: &mut [u8]) -> Result<(), (
                 .bulk_in
                 .as_mut()
                 .ok_or(())?;
-            host::enqueue_ep(ring, bounce.as_u64(), n as u32, host::trb(CYCLE, TRB_NORMAL, IOC));
+            host::enqueue_ep(
+                ring,
+                bounce.as_u64(),
+                n as u32,
+                host::trb(CYCLE, TRB_NORMAL, IOC),
+            );
         }
         compiler_fence(Ordering::SeqCst);
         host::doorbell(hc, slot, dci);
@@ -465,9 +470,7 @@ pub(super) fn interrupt_poll(hc: &mut Host, slot: u8, dci: u8, buf: &mut [u8]) -
             .iter()
             .position(|e| e.as_ref().is_some_and(|ep| ep.dci == dci))?
     };
-    let armed = hc.slots[slot as usize]
-        .as_ref()?
-        .int_eps[ep_i]
+    let armed = hc.slots[slot as usize].as_ref()?.int_eps[ep_i]
         .as_ref()?
         .armed;
     if !armed {

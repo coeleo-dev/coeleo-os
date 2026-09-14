@@ -21,7 +21,7 @@ Do not let two `make run-ahci` (or QEMU + `mcopy`) open the same `disk-ahci.img`
 | The same E0152 when building `coe-pack` “via userspace” | `build-std` + host `std` crate | `make -C tools/coe-pack`, never `--manifest-path userspace/Cargo.toml` for the packer. |
 | Kernel that does not link, triple fault, or odd stack behaviour | `cargo build` in `kernel/` without red zone / static reloc | `make -C kernel` (`RUSTFLAGS` are in [`kernel/GNUmakefile`](../../kernel/GNUmakefile)). |
 | `curve25519` / LLVM crash in userspace | dalek SIMD backend on `x86_64-unknown-none` | `--cfg curve25519_dalek_backend="serial"` is already in [`userspace/.cargo/config.toml`](../../userspace/.cargo/config.toml). Do not remove it. |
-| `coeleo-draw` panic in `build.rs`: missing TTF | crate moved; path `../../../docs/fonts/IBMPlexMono-Regular.ttf` | Update the path in `build.rs` relative to `userspace/libs/coeleo-draw`. |
+| `coeleo-draw` panic in `build.rs`: missing TTF | crate moved; path `../../../docs/fonts/Ubuntu-R.ttf` | Update the path in `build.rs` relative to `userspace/libs/coeleo-draw`. |
 | rustup cannot find nightly / `x86_64-unknown-none` | toolchain not installed | Build once from `kernel/` so `rust-toolchain.toml` applies; `rustup target add x86_64-unknown-none` if needed. |
 
 ## QEMU
