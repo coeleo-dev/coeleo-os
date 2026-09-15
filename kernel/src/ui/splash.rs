@@ -8,7 +8,7 @@ use coeleo_theme::{ACCENT, BG, DIM};
 
 use crate::fbterm::{self, FbInfo};
 
-const ICON_PNG: &[u8] = include_bytes!("../../../docs/image/coeleo-icon.png");
+const ICON_PNG: &[u8] = include_bytes!("../../../docs/image/Union.png");
 const ICON: u32 = 96;
 const SPINNER_R: i32 = 16;
 const DOT: u32 = 6;

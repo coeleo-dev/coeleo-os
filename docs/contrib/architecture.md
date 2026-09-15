@@ -1,6 +1,6 @@
 # Architecture
 
-Map of the current code. Behaviour and phases: [spec v0.2](../requirements/coeleo-os-specification-v02.md). Where to put new code and the `crate::comp` / `crate::sched` contract: [`AGENTS.md`](../../AGENTS.md). After 1–15 (reference class **R15**): [roadmap](../roadmap-pos-fase-15.md). Index **16–49**: [implementation-plan-full.md](../requirements/implementation-plan-full.md). In-tree through **21** (16 ACPI/RTC, 17.1–17.4 installer + xHCI/USB MSC, 18 e1000e, 19 DHCP/DNS, 20 argv/pipes, 20b `sh` history/Tab, daily `mkdir`/`echo`/`pwd`, 21 TUI `edit`; USB HID on that xHCI host). Next: [phase 22 TLS + pkg HTTP](../requirements/demands/phase-22-tls-pkg-http.md).
+Map of the current code. Where to put new code and the `crate::comp` / `crate::sched` contract: [`AGENTS.md`](../../AGENTS.md).
 
 ## Boot
 

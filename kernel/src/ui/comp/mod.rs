@@ -848,7 +848,7 @@ pub fn poll() {
                             let lx = x.saturating_sub(last.ox);
                             let ly = y.saturating_sub(last.oy.saturating_add(DECO_H));
                             drop(g);
-                            let a = crate::deskset::click_at(lx, ly, last.cw);
+                            let a = crate::deskset::click_at(lx, ly, last.cw, last.ch);
                             apply_desk_action(a);
                             refresh_settings();
                             return;

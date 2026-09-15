@@ -311,9 +311,10 @@ pub fn sync() -> Result<(), FsError> {
     let fs = g.take().ok_or(FsError::NoFs)?;
     let _ = fs.unmount();
     drop(g);
-    crate::blk::flush_at(disk).map_err(|_| FsError::Io)?;
+    // flush may fail (e.g. QEMU block-0 restriction); always try to remount.
+    let flush_ok = crate::blk::flush_at(disk).is_ok();
     if try_mount(disk, start, size) {
-        Ok(())
+        if flush_ok { Ok(()) } else { Err(FsError::Io) }
     } else {
         Err(FsError::Io)
     }

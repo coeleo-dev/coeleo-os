@@ -135,9 +135,13 @@ unsafe extern "C" fn kmain() -> ! {
         while let Some(b) = kbd::pop_byte() {
             shell::handle_byte(b);
         }
+        serial::write_str("kmain: comp::poll\n");
         comp::poll();
+        serial::write_str("kmain: net::poll\n");
         net::poll();
+        serial::write_str("kmain: clock::paint\n");
         clock::paint_if_second_elapsed();
+        // serial::write_str("kmain: wait\n"); // too noisy
         interrupts::wait();
     }
 }

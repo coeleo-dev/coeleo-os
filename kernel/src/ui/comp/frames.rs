@@ -81,11 +81,11 @@ pub(super) fn ensure_frame(st: &mut State, kind: FrameKind) -> Option<usize> {
             (48, 48, fm_w, fm_h)
         }
         FrameKind::Settings => {
-            let w = 360u32.min(st.fb.w.saturating_sub(64)).max(200);
-            let h = 280u32
+            let w = 520u32.min(st.fb.w.saturating_sub(64)).max(360);
+            let h = 400u32
                 .min(work.saturating_sub(40 + DECO_H + 8 + SHADOW_PX))
-                .max(120);
-            (80, 40, w, h)
+                .max(280);
+            (60, 36, w, h)
         }
         FrameKind::Client(_) => return None,
     };

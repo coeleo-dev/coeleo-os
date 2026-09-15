@@ -14,7 +14,7 @@ use x86_64::structures::tss::TaskStateSegment;
 pub const DOUBLE_FAULT_IST_INDEX: u16 = 0;
 
 const IST_SIZE: usize = 16 * 1024;
-pub const USER_KERNEL_STACK_SIZE: usize = 16 * 1024;
+pub const USER_KERNEL_STACK_SIZE: usize = 128 * 1024;
 
 #[repr(align(16))]
 struct IstStack([u8; IST_SIZE]);

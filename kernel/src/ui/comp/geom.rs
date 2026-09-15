@@ -59,6 +59,7 @@ pub(super) fn app_label(name: &str) -> &str {
     match name {
         "files" => "Files",
         "sh" => "Terminal",
+        "settings" => "Settings",
         "hello" => "Hello",
         "widgets" => "Widgets",
         "winprobe" => "Winprobe",

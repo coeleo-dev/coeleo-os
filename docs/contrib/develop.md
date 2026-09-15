@@ -90,7 +90,7 @@ New shared lib: `userspace/libs/<name>/` **only** if there is already a real sec
 
 ## New syscall
 
-Only when the [spec](../requirements/coeleo-os-specification-v02.md) requires it. Two places in the same step:
+Two places in the same step:
 
 - Number and `match` in [`kernel/src/task/syscall.rs`](../../kernel/src/task/syscall.rs); implementation in the owning module (`fd`, `win`, `sched`, `net`, …).
 - `SYS_*` constant and wrapper in [`userspace/libs/libcoeleo`](libs/libcoeleo.md).

@@ -134,6 +134,7 @@ pub(super) fn launcher_entries() -> Vec<String> {
     let mut found = Vec::new();
     found.push(String::from("files"));
     found.push(String::from("sh"));
+    found.push(String::from("settings"));
     if let Ok(ents) = fs::list("/") {
         for e in ents {
             if e.is_dir {
@@ -525,6 +526,10 @@ pub(super) fn focus_named(st: &mut State, name: &str) -> bool {
     let kind = match name {
         "sh" => FrameKind::Vt,
         "files" => FrameKind::Files,
+        "settings" => {
+            crate::deskset::refresh();
+            FrameKind::Settings
+        }
         _ => return false,
     };
     let old_top = visible_top(st);

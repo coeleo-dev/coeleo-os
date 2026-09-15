@@ -15,6 +15,7 @@ const QUEUE_CAP: usize = 64;
 static mut BYTES: [u8; QUEUE_CAP] = [0; QUEUE_CAP];
 static HEAD: AtomicUsize = AtomicUsize::new(0);
 static TAIL: AtomicUsize = AtomicUsize::new(0);
+
 static LALT: AtomicBool = AtomicBool::new(false);
 static RALT: AtomicBool = AtomicBool::new(false);
 static LSHIFT: AtomicBool = AtomicBool::new(false);

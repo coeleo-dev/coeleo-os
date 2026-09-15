@@ -9,7 +9,7 @@ use crate::panel;
 use crate::serial;
 
 const WALL_JPG: &[u8] = include_bytes!("../../../docs/image/wallpaper.jpg");
-const ICON_PNG: &[u8] = include_bytes!("../../../docs/image/coeleo-icon.png");
+const ICON_PNG: &[u8] = include_bytes!("../../../docs/image/Union.png");
 const CFG_PATH: &str = "/desk.cfg";
 const MENU_ICON: u32 = 24;
 
@@ -119,9 +119,9 @@ pub fn save_cfg(cfg: &DeskCfg) {
     buf.push('\n');
     match fs::write_file(CFG_PATH, buf.as_bytes()) {
         Ok(()) => {
-            if fs::sync().is_err() {
-                serial::write_str("desk: cfg sync fail\n");
-            }
+            // if fs::sync().is_err() {
+            //     serial::write_str("desk: cfg sync fail\n");
+            // }
         }
         Err(FsError::NoFs) => serial::write_str("desk: cfg no fs\n"),
         Err(_) => serial::write_str("desk: cfg write fail\n"),

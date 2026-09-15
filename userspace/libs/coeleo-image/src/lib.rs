@@ -213,20 +213,24 @@ pub fn scale_box(src: &[u32], sw: u32, sh: u32, dw: u32, dh: u32) -> Result<Vec<
             for sy in y0..y1 {
                 for sx in x0..x1 {
                     let p = src[(sy * sw as u64 + sx) as usize];
-                    bb += u64::from(p & 0xff);
-                    gb += u64::from((p >> 8) & 0xff);
-                    rb += u64::from((p >> 16) & 0xff);
-                    ab += u64::from((p >> 24) & 0xff);
+                    let a = u64::from((p >> 24) & 0xff);
+                    bb += u64::from(p & 0xff) * a;
+                    gb += u64::from((p >> 8) & 0xff) * a;
+                    rb += u64::from((p >> 16) & 0xff) * a;
+                    ab += a;
                     cnt += 1;
                 }
             }
             if cnt == 0 {
                 continue;
             }
-            out[(y * dw + x) as usize] = ((bb / cnt) as u32)
-                | (((gb / cnt) as u32) << 8)
-                | (((rb / cnt) as u32) << 16)
-                | (((ab / cnt) as u32) << 24);
+            let (r, g, b) = if ab > 0 {
+                ((rb / ab) as u32, (gb / ab) as u32, (bb / ab) as u32)
+            } else {
+                (0, 0, 0)
+            };
+            let a = (ab / cnt) as u32;
+            out[(y * dw + x) as usize] = b | (g << 8) | (r << 16) | (a << 24);
         }
     }
     Ok(out)

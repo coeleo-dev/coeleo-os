@@ -26,6 +26,35 @@ pub fn text_width(s: &str) -> u32 {
         .fold(0u32, u32::saturating_add)
 }
 
+/// Horizontal bounds of the visible ink of `s`, relative to the draw origin:
+/// `(left, right)`, `right` exclusive. [`text_width`] measures the advance box,
+/// which carries the left side bearing of the first glyph and the right bearing
+/// of the last, so a label centred on it looks pushed to the right.
+pub fn text_ink(s: &str) -> (u32, u32) {
+    let mut pen = 0u32;
+    let mut left = u32::MAX;
+    let mut right = 0u32;
+    for ch in s.chars() {
+        let u = ch as u32;
+        let c = if u > 255 { b'?' } else { u as u8 };
+        for gy in 0..FONT_H {
+            for gx in 0..FONT_W {
+                if font::coverage(c, gx, gy) == 0 {
+                    continue;
+                }
+                left = left.min(pen.saturating_add(gx));
+                right = right.max(pen.saturating_add(gx).saturating_add(1));
+            }
+        }
+        pen = pen.saturating_add(font::advance(c));
+    }
+    if left == u32::MAX {
+        (0, 0)
+    } else {
+        (left, right)
+    }
+}
+
 const SDF_S: i32 = 8;
 
 #[derive(Clone, Copy)]
