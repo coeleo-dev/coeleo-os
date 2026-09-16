@@ -39,7 +39,7 @@ The kernel is **one** crate. Folders are modules, not new crates. `main.rs` reex
 | Memory | `kernel/src/mem/` | PMM, VMM, heap |
 | PCI / USB host | `kernel/src/bus/` | PCI config space, xHCI |
 | Disk / FAT | `kernel/src/fs/` | FAT (`fs/mod.rs`), AHCI, block, GPT, USB MSC, install |
-| Network | `kernel/src/net/` | smoltcp (`net/mod.rs`), HTTP, DHCP, DNS A, virtio-net **or** e1000e (one PHY) |
+| Network | `kernel/src/net/` | smoltcp (`net/mod.rs`), HTTP, TLS (rustls), DHCP, DNS A, virtio-net **or** e1000e (one PHY) |
 | Input | `kernel/src/input/` | keyboard, mouse, PS/2, UHCI, xHCI HID |
 | Desktop | `kernel/src/ui/` | compositor (`ui/comp/`), panel, KRunner, FM (`ui/fm/`), VT, windows |
 | Processes | `kernel/src/task/` | scheduler (`task/sched/`), syscalls, FDs, pipes, ELF |
@@ -48,9 +48,9 @@ The kernel is **one** crate. Folders are modules, not new crates. `main.rs` reex
 
 **Compositor** (`kernel/src/ui/comp/`): public API in `mod.rs` (`init`, `poll`, `irq_*`, `on_client_*`, …). Paint (shadow, deco, blit) is separate from policy (focus, z-order, launcher). Dirty-rect, not full-frame. The VT (Flanterm) is one window; the file manager is another. Tab and arrows on the VT reach stdin; Tab still cycles windows when Files or an overlay has focus.
 
-**Scheduler** (`kernel/src/task/sched/`): `mod.rs` is the facade. `unsafe`, `naked_asm`, and the `KSTACKS` / `KCONTS` / `FXSAVES` statics stay in `switch.rs`. Do not scatter the context switch. One thread per process; `MAX_PROC` is 4.
+**Scheduler** (`kernel/src/task/sched/`): `mod.rs` is the facade. `unsafe`, `naked_asm`, and the `KSTACKS` / `KCONTS` / `FXSAVES` statics stay in `switch.rs`. Do not scatter the context switch. One thread per process; `MAX_PROC` is 8.
 
-**Syscalls:** table in [`kernel/src/task/syscall.rs`](../../kernel/src/task/syscall.rs) (`SYS_EXIT` = 1 … `SYS_MKDIR` = 26). `SYS_SPAWN` takes a 48-byte `SpawnArgs` (path, NUL-separated argv, stdin/stdout fds to clone); `SYS_PIPE` returns two fds; `SYS_MKDIR` creates a FAT directory. `SYS_DISKS` / `SYS_INSTALL` are the installer. `sh` wires `|` `>` `<` at spawn (no `fork`/`dup2`). ELFs call through [libcoeleo](libs/libcoeleo.md).
+**Syscalls:** table in [`kernel/src/task/syscall.rs`](../../kernel/src/task/syscall.rs) (`SYS_EXIT` = 1 … `SYS_CLIPBOARD` = 27). `SYS_SPAWN` takes a 48-byte `SpawnArgs` (path, NUL-separated argv, stdin/stdout fds to clone); `SYS_PIPE` returns two fds; `SYS_MKDIR` creates a FAT directory. `SYS_DISKS` / `SYS_INSTALL` are the installer. `sh` wires `|` `>` `<` at spawn (no `fork`/`dup2`). ELFs call through [libcoeleo](libs/libcoeleo.md).
 
 The kernel depends on crates in `userspace/libs/`: `coeleo-theme`, `coeleo-draw`, `coeleo-image` (path in [`kernel/Cargo.toml`](../../kernel/Cargo.toml)).
 
@@ -64,7 +64,7 @@ Workspace: [`userspace/Cargo.toml`](../../userspace/Cargo.toml). Target `x86_64-
 
 Ring 3 GUI chain: `widgets` / `install` → `libcoeleoui` → `coeleo-draw` + `coeleo-theme` + `libcoeleo` (`win_create` / `win_damage` / `poll_input`). The kernel compositor paints chrome (panel, shadow, deco) with the same theme/draw. The client paints an **opaque** buffer.
 
-`sh` is split into `cwd` / `fs` / `net` / `pkg` / `path` / `exec` / `line` / `complete` under `userspace/apps/sh/src/`. History is a 16-line ring (not persisted); Tab completes unique non-directory names from `/bin` and the cwd. The line editor moves with Left/Right; `pwd` / `echo` / `clear` / `mkdir` / `cp` / `mv` are builtins (`echo` with `|` `>` is the ELF). It does not need its own sheet in this directory.
+`sh` is split into `cwd` / `fs` / `net` / `pkg` / `path` / `exec` / `line` / `complete` under `userspace/apps/sh/src/`. History is a 128-line ring (not persisted); Tab completes unique non-directory names from `/bin` and the cwd. The line editor moves with Left/Right; `pwd` / `echo` / `clear` / `mkdir` / `cp` / `mv` are builtins (`echo` with `|` `>` is the ELF). It does not need its own sheet in this directory.
 
 ## Disk
 
@@ -77,4 +77,6 @@ Directories on the FAT: `docs/`, `bin/` (`pkg install` destination), `pacotes/` 
 
 ## Network
 
-One PHY: virtio-net if present, otherwise e1000e. QEMU user-net: DHCP in the kernel (smoltcp); if the lease fails, static **10.0.2.15/24** and gateway **10.0.2.2**. `get`/`ping` accept an IPv4 literal or a hostname with a dot (DNS A). `ping 10.0.2.2` is the phase 11 acceptance; ICMP to the Internet on user-net is not. `make run` keeps virtio-net; e1000e is `make test-phase18` / `make test-phase19` / `make run-e1000e`. No TLS.
+One PHY: virtio-net if present, otherwise e1000e. QEMU user-net: DHCP in the kernel (smoltcp); if the lease fails, static **10.0.2.15/24** and gateway **10.0.2.2**. `get`/`ping` accept an IPv4 literal or a hostname with a dot (DNS A). `ping 10.0.2.2` is the phase 11 acceptance; ICMP to the Internet on user-net is not. `make run` keeps virtio-net; e1000e is `make test-phase18` / `make test-phase19` / `make run-e1000e`.
+
+**TLS** (`kernel/src/net/tls.rs`): an `https://` URL takes the rustls path instead of the plaintext one (scheme check in `net/mod.rs`). rustls 1.2/1.3 via `UnbufferedClientConnection`, with the `rustls-rustcrypto` provider. Entropy is `RDRAND`, hooked into `getrandom`; the clock is the RTC behind a `TimeProvider`. Trust is **one** baked CA (`net/ca.der`, `include_bytes!`), not a system root store — a public site with an ordinary chain is rejected. `test-phase22` serves locally and asserts both outcomes: chaining to the baked CA succeeds, a certificate outside it fails.
