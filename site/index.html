@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Coeleo OS — a from-scratch x86_64 operating system in Rust</title>
+<meta name="description" content="Coeleo OS is a from-scratch x86_64 operating system written in Rust: its own kernel, syscall ABI, software compositor, shell and userspace. The kernel, the desktop and the userspace are code in one repository. MIT OR Apache-2.0.">
+<meta name="theme-color" content="#0F1218">
+<meta name="color-scheme" content="dark">
+
+<link rel="icon" href="assets/img/logo.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="assets/img/icon.png">
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Coeleo OS">
+<meta property="og:title" content="Coeleo OS — a from-scratch x86_64 operating system in Rust">
+<meta property="og:description" content="Its own kernel, syscall ABI, software compositor, shell and userspace. Built in one repository, from boot to desktop.">
+<meta property="og:url" content="https://coeleo-dev.github.io/coeleo-os/">
+<meta property="og:image" content="https://coeleo-dev.github.io/coeleo-os/assets/img/og.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:type" content="image/jpeg">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Coeleo OS — a from-scratch x86_64 operating system in Rust">
+<meta name="twitter:description" content="Its own kernel, syscall ABI, software compositor, shell and userspace. Built in one repository, from boot to desktop.">
+<meta name="twitter:image" content="https://coeleo-dev.github.io/coeleo-os/assets/img/og.jpg">
+
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+
+<a class="skip-link" href="#main">Skip to content</a>
+
+<header class="nav" id="nav">
+  <div class="wrap nav__inner">
+    <a class="nav__brand" href="#top">
+      <img src="assets/img/logo.svg" alt="" width="28" height="28">
+      <span>Coeleo&nbsp;OS</span>
+    </a>
+
+    <button class="nav__toggle" id="navToggle" aria-expanded="false" aria-controls="navMenu" aria-label="Toggle navigation">
+      <span></span><span></span><span></span>
+    </button>
+
+    <nav class="nav__menu" id="navMenu" aria-label="Sections">
+      <a href="#features">Features</a>
+      <a href="#screenshots">Screenshots</a>
+      <a href="#architecture">Architecture</a>
+      <a href="#build">Build</a>
+      <a href="#roadmap">Roadmap</a>
+      <a href="#docs">Docs</a>
+      <a class="nav__cta" href="https://github.com/coeleo-dev/coeleo-os" target="_blank" rel="noopener">
+        <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
+        GitHub
+      </a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+
+<!-- ─────────────────────────────  HERO  ───────────────────────────── -->
+<section class="hero" id="top">
+  <div class="wrap hero__inner">
+    <div class="hero__copy">
+      <h1 class="hero__title">
+        <img class="hero__logo" src="assets/img/logo.svg" alt="Coeleo OS" width="72" height="72">
+        Coeleo&nbsp;OS
+      </h1>
+
+      <p class="hero__tagline">A from-scratch x86_64 operating system, written in Rust.</p>
+
+      <p class="hero__lead">
+        Not Linux, not Windows, not Redox, not an RTOS. The kernel, the syscall ABI, the design
+        system and the userspace are built in this repository — from boot to desktop.
+      </p>
+
+      <ul class="badges">
+        <li class="badge">MIT OR Apache-2.0</li>
+        <li class="badge">Rust nightly</li>
+        <li class="badge">x86_64</li>
+      </ul>
+
+      <div class="hero__actions">
+        <a class="btn btn--primary" href="https://github.com/coeleo-dev/coeleo-os" target="_blank" rel="noopener">View on GitHub</a>
+        <a class="btn" href="#build">Build &amp; run</a>
+        <a class="btn btn--ghost" href="https://github.com/coeleo-dev/coeleo-os/blob/main/README.md" target="_blank" rel="noopener">Read the docs</a>
+      </div>
+
+      <dl class="stats">
+        <div><dt>Syscalls</dt><dd>27</dd></div>
+        <div><dt>Process slots</dt><dd>8</dd></div>
+        <div><dt>Paging</dt><dd>4-level</dd></div>
+        <div><dt>Cores used</dt><dd>1</dd></div>
+      </dl>
+    </div>
+
+    <figure class="hero__shot">
+      <div class="frame frame--tall">
+        <div class="frame__bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="frame__title">coeleo · desktop</span></div>
+        <img src="assets/img/shots/screenshot-01.webp" alt="Coeleo OS desktop running in QEMU" width="1278" height="799" fetchpriority="high" decoding="async">
+      </div>
+    </figure>
+  </div>
+</section>
+
+<!-- ─────────────────────────────  REUSE  ───────────────────────────── -->
+<section class="section section--alt" id="reuse">
+  <div class="wrap">
+    <h2 class="section__title">Assembled from focused components — not a whole OS</h2>
+    <p class="section__lead">
+      Coeleo OS selectively reuses <strong>focused components</strong> rather than embedding a
+      whole operating system. Everything else is code you can read here.
+    </p>
+
+    <ul class="reuse">
+      <li><a href="https://github.com/limine-bootloader/limine" target="_blank" rel="noopener">Limine</a><span>Bootloader (UEFI and BIOS)</span></li>
+      <li><a href="https://github.com/mintsuki/flanterm" target="_blank" rel="noopener">Flanterm</a><span>Terminal emulation</span></li>
+      <li><a href="https://github.com/smoltcp-rs/smoltcp" target="_blank" rel="noopener">smoltcp</a><span>TCP/IP stack</span></li>
+      <li><a href="https://github.com/rafalh/rust-fatfs" target="_blank" rel="noopener">fatfs</a><span>FAT32 filesystem</span></li>
+      <li><a href="https://github.com/rustls/rustls" target="_blank" rel="noopener">rustls</a><span>TLS 1.2 / 1.3</span></li>
+    </ul>
+
+    <p class="reuse__note">
+      The rest — physical and virtual memory, the heap, the preemptive scheduler, the syscall ABI,
+      the software compositor, the design system, the shell, the UI toolkit, the file manager, the
+      installer and the package manager — is implemented in this repository.
+    </p>
+  </div>
+</section>
+
+<!-- ─────────────────────────────  FEATURES  ───────────────────────────── -->
+<section class="section" id="features">
+  <div class="wrap">
+    <h2 class="section__title">What is implemented</h2>
+    <p class="section__lead">Boot to a desktop and a working prompt: its own memory, scheduler, syscall ABI, filesystem, drivers and compositor, with a userspace on top. One core, a software framebuffer and at most eight processes at once.</p>
+
+    <div class="fgroup">
+      <h3 class="fgroup__title"><span>01</span> Kernel and hardware</h3>
+      <div class="cards">
+        <article class="card">
+          <h3>Boot and CPU foundation</h3>
+          <p>Limine on UEFI and legacy BIOS, GDT, IDT, LAPIC timer and interrupt routing, ACPI and a civil RTC clock. Context switching lives in naked assembly in one file.</p>
+        </article>
+
+        <article class="card">
+          <h3>Memory management</h3>
+          <p>A physical frame bitmap (PMM), 4-level paging (VMM) with strict user/kernel address-space isolation, and a kernel heap allocator.</p>
+        </article>
+
+        <article class="card">
+          <h3>Preemptive scheduler</h3>
+          <p>Round-robin driven by LAPIC timer interrupts, with a PCB table capped at 8 concurrent processes, zombie reaping and clean resource teardown.</p>
+        </article>
+
+        <article class="card">
+          <h3>Syscall layer</h3>
+          <p>27 syscalls reached through <code>libcoeleo</code>, covering processes, files, pipes, the network, time, window surfaces, system info and the clipboard.</p>
+        </article>
+
+        <article class="card">
+          <h3>FAT32 and storage</h3>
+          <p>FAT32 with cluster allocation, long filenames, traversal, read, write, truncate and sync. Disk backends: VirtIO-blk, SATA AHCI with GPT partitions, and USB Mass Storage.</p>
+        </article>
+
+        <article class="card">
+          <h3>Networking</h3>
+          <p><code>smoltcp</code> over virtio-net or Intel e1000e — one PHY, picked at boot. Static IPv4 or DHCP, ARP, ICMP echo, DNS A records, an HTTP client and TLS 1.2/1.3.</p>
+        </article>
+
+        <article class="card">
+          <h3>Input drivers</h3>
+          <p>PS/2 keyboard with full scancode translation and key event dispatch; PS/2 and USB HID mice over UHCI and xHCI controllers.</p>
+        </article>
+      </div>
+    </div>
+
+    <div class="fgroup">
+      <h3 class="fgroup__title"><span>02</span> Desktop</h3>
+      <div class="cards">
+        <article class="card">
+          <h3>Software 2D compositor</h3>
+          <p>Pure CPU linear-framebuffer rendering with dirty-rect clipping and selective damage updates, so only what changed is repainted. No hardware acceleration.</p>
+        </article>
+
+        <article class="card">
+          <h3>One shared design system</h3>
+          <p>Kernel chrome and Ring&nbsp;3 applications paint from the same palette and metrics (<code>coeleo-theme</code>), with SDF hairline borders, anti-aliased corners and layered shadows.</p>
+        </article>
+
+        <article class="card">
+          <h3>Window management</h3>
+          <p>Floating windows with dragging, 8-direction edge resize, minimise / maximise / close controls, title elision and a glowing accent border on the focused window.</p>
+        </article>
+
+        <article class="card">
+          <h3>Panel and launcher</h3>
+          <p>A floating pill or full-width panel with a live clock and network indicator, plus KRunner (Alt+Space) — a modal overlay with fuzzy search and keyboard navigation.</p>
+        </article>
+
+        <article class="card">
+          <h3>Graphical file manager</h3>
+          <p>An embedded dual-pane explorer with breadcrumb pills, a Places and Devices sidebar, per-file icons and keyboard navigation.</p>
+        </article>
+
+        <article class="card">
+          <h3>Clipboard and notifications</h3>
+          <p>A kernel-level global clipboard behind <code>SYS_CLIPBOARD</code>, shared by the terminal, the shell and GUI apps. Floating rounded toasts report background work, copies and alerts.</p>
+        </article>
+
+        <article class="card">
+          <h3>Wallpaper and settings</h3>
+          <p>Full-screen desktop with solid colours or decoded JPEG/PNG wallpapers, with preferences persisted to the disk across reboots.</p>
+        </article>
+      </div>
+    </div>
+
+    <div class="fgroup">
+      <h3 class="fgroup__title"><span>03</span> Shell and terminal</h3>
+      <div class="cards">
+        <article class="card">
+          <h3>Virtual terminal</h3>
+          <p>A Flanterm terminal embedded in the window, with a 16-colour ANSI palette harmonised with the Slate theme, cursor positioning, bold text and clean blits.</p>
+        </article>
+
+        <article class="card">
+          <h3>Readline-class shell</h3>
+          <p>Line editing with Home/End, word jumps, kill and transpose; a 128-entry history ring, <kbd>Ctrl</kbd>+<kbd>R</kbd> reverse search, Tab completion, aliases, semicolons, pipes and redirects.</p>
+        </article>
+
+        <article class="card">
+          <h3>Command catalog</h3>
+          <p>52 builtins across files and directories, text processing (<code>grep</code>, <code>wc</code>, <code>head</code>, <code>tail</code>), processes and memory, storage inspection, packages, networking and power.</p>
+        </article>
+
+        <article class="card">
+          <h3>Errors that help</h3>
+          <p>Semantically styled <code>error:</code>, <code>warning:</code>, <code>tip:</code> and <code>usage:</code> prefixes, target-specific descriptions, and a Levenshtein suggestion engine that asks “did you mean…?”.</p>
+        </article>
+      </div>
+    </div>
+
+    <div class="fgroup">
+      <h3 class="fgroup__title"><span>04</span> Applications and packages</h3>
+      <div class="cards">
+        <article class="card">
+          <h3>Signed packages</h3>
+          <p>Ed25519 signatures and SHA-256 integrity verification for <code>.coe</code> payloads, fetched over plaintext HTTP or TLS and installed from disk or the network.</p>
+        </article>
+
+        <article class="card">
+          <h3>Text editor</h3>
+          <p><code>edit</code>, a TUI editor on the virtual terminal, with save and quit shortcuts.</p>
+        </article>
+
+        <article class="card">
+          <h3>OS installer</h3>
+          <p>A graphical and CLI installer that deploys the system onto a GPT-partitioned AHCI or USB disk.</p>
+        </article>
+
+        <article class="card">
+          <h3>Immediate-mode UI toolkit</h3>
+          <p><code>libcoeleoui</code> gives Ring&nbsp;3 apps the same widget language as the desktop; the <code>widgets</code> binary is a live demo of it.</p>
+        </article>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─────────────────────────────  SCREENSHOTS  ───────────────────────────── -->
+<section class="section section--alt" id="screenshots">
+  <div class="wrap">
+    <h2 class="section__title">Screenshots</h2>
+    <p class="section__lead">Captured from Coeleo OS running under QEMU. Select an image to enlarge.</p>
+
+    <div class="gallery" id="gallery">
+      <figure class="shot"><button type="button" aria-label="Enlarge screenshot 1"><img src="assets/img/shots/screenshot-01.webp" alt="Coeleo OS screenshot 1" width="1278" height="799" loading="lazy" decoding="async"></button></figure>
+      <figure class="shot"><button type="button" aria-label="Enlarge screenshot 2"><img src="assets/img/shots/screenshot-02.webp" alt="Coeleo OS screenshot 2" width="1281" height="800" loading="lazy" decoding="async"></button></figure>
+      <figure class="shot"><button type="button" aria-label="Enlarge screenshot 3"><img src="assets/img/shots/screenshot-03.webp" alt="Coeleo OS screenshot 3" width="1281" height="801" loading="lazy" decoding="async"></button></figure>
+      <figure class="shot"><button type="button" aria-label="Enlarge screenshot 4"><img src="assets/img/shots/screenshot-04.webp" alt="Coeleo OS screenshot 4" width="1282" height="800" loading="lazy" decoding="async"></button></figure>
+      <figure class="shot"><button type="button" aria-label="Enlarge screenshot 5"><img src="assets/img/shots/screenshot-05.webp" alt="Coeleo OS screenshot 5" width="1281" height="802" loading="lazy" decoding="async"></button></figure>
+      <figure class="shot"><button type="button" aria-label="Enlarge screenshot 6"><img src="assets/img/shots/screenshot-06.webp" alt="Coeleo OS screenshot 6" width="1281" height="801" loading="lazy" decoding="async"></button></figure>
+      <figure class="shot"><button type="button" aria-label="Enlarge screenshot 7"><img src="assets/img/shots/screenshot-07.webp" alt="Coeleo OS screenshot 7" width="1280" height="801" loading="lazy" decoding="async"></button></figure>
+    </div>
+  </div>
+</section>
+
+<!-- ─────────────────────────────  ARCHITECTURE  ───────────────────────────── -->
+<section class="section" id="architecture">
+  <div class="wrap">
+    <h2 class="section__title">Architecture</h2>
+    <p class="section__lead">One kernel crate, folders by domain. Programmes are static Ring&nbsp;3 ELFs on top, and a syscall ABI is the only thing that crosses the line.</p>
+
+    <pre class="term"><code>  Ring 3 - userspace                Ring 0 - kernel
+  --------------------------------  --------------------------------
+   static no_std ELFs               one crate
+   entry at _start                  folders by domain, not crates
+   no libc, no dynamic linking      no userspace code linked in
+
+                |                     |
+                |    syscalls (27)    |
+                +---------------------+
+                  libcoeleo wrappers
+                  the only crossing between rings</code></pre>
+
+    <div class="table-scroll">
+      <table>
+        <caption class="sr-only">Kernel domain map</caption>
+        <thead>
+          <tr><th scope="col">Domain</th><th scope="col">Folder</th><th scope="col">Responsibility</th></tr>
+        </thead>
+        <tbody>
+          <tr><th scope="row">Boot / CPU</th><td><code>boot/</code></td><td>GDT, IDT, LAPIC, console, ACPI, RTC</td></tr>
+          <tr><th scope="row">Memory</th><td><code>mem/</code></td><td>PMM, VMM, kernel heap</td></tr>
+          <tr><th scope="row">PCI / USB host</th><td><code>bus/</code></td><td>PCI config space, xHCI</td></tr>
+          <tr><th scope="row">Disk / FAT</th><td><code>fs/</code></td><td>FAT32, block layer, GPT, AHCI, USB MSC, installer</td></tr>
+          <tr><th scope="row">Network</th><td><code>net/</code></td><td>smoltcp, HTTP, TLS, DHCP, DNS A, virtio-net or e1000e</td></tr>
+          <tr><th scope="row">Input</th><td><code>input/</code></td><td>PS/2 keyboard and mouse, UHCI, xHCI HID</td></tr>
+          <tr><th scope="row">Desktop</th><td><code>ui/</code></td><td>Compositor, panel, KRunner, file manager, VT, windows</td></tr>
+          <tr><th scope="row">Processes</th><td><code>task/</code></td><td>Preemptive scheduler, syscalls, FDs, pipes, ELF loader</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ─────────────────────────────  APPS & LIBS  ───────────────────────────── -->
+<section class="section section--alt" id="apps">
+  <div class="wrap">
+    <h2 class="section__title">Userspace and libraries</h2>
+    <p class="section__lead">
+      Programs are static <code>no_std</code> ELFs (<code>x86_64-unknown-none</code>) that enter at
+      <code>_start</code> and talk to the kernel through <code>libcoeleo</code>.
+    </p>
+
+    <div class="table-scroll">
+      <table>
+        <caption class="sr-only">Bundled applications</caption>
+        <thead><tr><th scope="col">Application</th><th scope="col">Role</th></tr></thead>
+        <tbody>
+          <tr><th scope="row"><code>sh</code></th><td>Interactive shell: line editing, completion, dynamic prompt, aliases, builtins</td></tr>
+          <tr><th scope="row"><code>edit</code></th><td>TUI text editor on the virtual terminal</td></tr>
+          <tr><th scope="row"><code>widgets</code></th><td>GUI demo of the immediate-mode <code>libcoeleoui</code> toolkit</td></tr>
+          <tr><th scope="row"><code>install</code></th><td>Graphical and CLI installer for GPT / AHCI disks</td></tr>
+          <tr><th scope="row"><code>winprobe</code></th><td>Ring&nbsp;3 surface creation and animation benchmark</td></tr>
+          <tr><th scope="row"><code>clock</code></th><td>Background graphical clock process</td></tr>
+          <tr><th scope="row"><code>ls</code> · <code>cat</code> · <code>echo</code></th><td>Standalone command-line file utilities</td></tr>
+          <tr><th scope="row"><code>hello</code> · <code>fault</code> · <code>spin</code></th><td>Spawn, fault-handling and CPU-loop verification binaries</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="table-scroll">
+      <table>
+        <caption class="sr-only">Shared no_std libraries</caption>
+        <thead><tr><th scope="col">Crate</th><th scope="col">Role</th></tr></thead>
+        <tbody>
+          <tr><th scope="row"><code>libcoeleo</code></th><td>Syscall wrappers with an allocation-free, safe API</td></tr>
+          <tr><th scope="row"><code>libcoeleoui</code></th><td>Immediate-mode UI widget toolkit</td></tr>
+          <tr><th scope="row"><code>coeleo-theme</code></th><td>Design tokens: palette and layout metrics</td></tr>
+          <tr><th scope="row"><code>coeleo-draw</code></th><td>2D primitives: SDF round strokes, text and icons</td></tr>
+          <tr><th scope="row"><code>coeleo-image</code></th><td>JPEG and PNG decoding for wallpapers</td></tr>
+          <tr><th scope="row"><code>pkg</code></th><td>Ed25519 verification and <code>.coe</code> package handling</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ─────────────────────────────  BUILD  ───────────────────────────── -->
+<section class="section" id="build">
+  <div class="wrap">
+    <h2 class="section__title">Build and run</h2>
+    <p class="section__lead">Requires a Linux host with QEMU. Rust nightly is pinned by the toolchain file.</p>
+
+    <div class="build">
+      <div class="build__col">
+        <h3>Prerequisites (Ubuntu / Debian)</h3>
+        <pre class="code"><code>sudo apt install make build-essential xorriso \
+  qemu-system-x86 python3 mtools gdisk</code></pre>
+      </div>
+
+      <div class="build__col">
+        <h3>Build, then boot</h3>
+        <pre class="code"><code># Kernel ISO, userspace ELFs and test packages
+make all
+
+# UEFI boot: virtio-blk, virtio-net, USB mouse
+make run</code></pre>
+      </div>
+    </div>
+
+    <details class="more">
+      <summary>Other run targets</summary>
+      <pre class="code"><code>make run-ahci    # SATA/AHCI boot disk with a GPT partition
+make run-e1000e  # Intel e1000e NIC instead of virtio-net
+make run-usb     # xHCI with USB Mass Storage
+make run-bios    # boot the ISO through legacy BIOS instead of UEFI
+make run-hdd     # boot from a GPT hard-disk image (UEFI)</code></pre>
+    </details>
+
+    <details class="more">
+      <summary>Automated tests</summary>
+      <p class="more__lead">
+        Integration suites run QEMU headless and assert against the serial log — including TLS and
+        package-signature verification.
+      </p>
+      <pre class="code"><code>make test-phase8 test-phase9 test-phase10 test-phase13 test-phase14
+make test-plasma-p2 test-plasma-p3 test-plasma-p4 test-plasma-p5 test-plasma-p6 test-plasma-p7
+make test-phase22</code></pre>
+    </details>
+  </div>
+</section>
+
+<!-- ─────────────────────────────  ROADMAP  ───────────────────────────── -->
+<section class="section section--alt" id="roadmap">
+  <div class="wrap">
+    <h2 class="section__title">Roadmap</h2>
+    <p class="section__lead">
+      Work here is phase-gated: one written spec, then the code, then that phase's gate. The order
+      below is what unblocks a person at a real machine, not what is easiest to demo.
+    </p>
+
+    <p class="roadmap__today">
+      <strong>Shipping today</strong> — from boot to a desktop: its own physical and virtual memory,
+      preemptive scheduler, syscall ABI, compositor, shell, editor, installer, package manager and
+      TLS. On one core, with at most eight processes at once, on FAT32.
+    </p>
+
+    <div class="roadmap">
+
+      <article class="band">
+        <header class="band__head">
+          <span class="pill pill--now">Next</span>
+          <h3>Leave the PS/2 desk</h3>
+          <p>Drivers that stop the machine depending on a 1990s port and a legacy disk controller.</p>
+        </header>
+        <ul class="band__list">
+          <li>
+            <span class="ph">27</span>
+            <div><strong>NVMe</strong>
+            <p>The typical internal SSD is not AHCI. This brings the same FAT tree up on a modern drive.</p></div>
+          </li>
+          <li>
+            <span class="ph">28</span>
+            <div><strong>USB-Ethernet</strong>
+            <p>Wired networking with no PCI NIC, so a machine with a dongle is not offline.</p></div>
+          </li>
+        </ul>
+      </article>
+
+      <article class="band">
+        <header class="band__head">
+          <span class="pill pill--soon">Then</span>
+          <h3>Session depth</h3>
+          <p>What turns a working prompt into a session you can rely on.</p>
+        </header>
+        <ul class="band__list">
+          <li>
+            <span class="ph">29</span>
+            <div><strong>Anonymous <code>mmap</code> and copy IPC</strong>
+            <p>Memory is reached through the library's allocation API today. A general mapping
+            interface is what unlocks the rest of this band.</p></div>
+          </li>
+          <li>
+            <span class="ph">30</span>
+            <div><strong>Userspace sockets</strong>
+            <p>The TCP/IP stack lives in the kernel today. Sockets expose TCP to Ring&nbsp;3 without
+            moving where the stack runs.</p></div>
+          </li>
+          <li>
+            <span class="ph">31</span>
+            <div><strong>HTML subset viewer</strong>
+            <p>Render real documents on the OS itself, starting from a defined subset of HTML and
+            CSS.</p></div>
+          </li>
+          <li>
+            <span class="ph">32</span>
+            <div><strong>User model</strong>
+            <p>Multi-user sessions and privilege levels, built as a Coeleo-native capability. There
+            are no users or privileges to elevate today.</p></div>
+          </li>
+          <li>
+            <span class="ph">33</span>
+            <div><strong>NTP</strong>
+            <p>Set the clock from the network instead of trusting the RTC alone.</p></div>
+          </li>
+        </ul>
+      </article>
+
+      <article class="band">
+        <header class="band__head">
+          <span class="pill pill--later">Later</span>
+          <h3>CPU, measured first</h3>
+          <p>One core and a 100&nbsp;Hz tick already cover the target envelope, so these wait for a
+          measurement that asks for them.</p>
+        </header>
+        <ul class="band__list">
+          <li>
+            <span class="ph">34</span>
+            <div><strong>Tickless LAPIC</strong>
+            <p>Stop paying for a periodic interrupt when nothing is runnable.</p></div>
+          </li>
+          <li>
+            <span class="ph">35</span>
+            <div><strong>Symmetric multiprocessing</strong>
+            <p>Put every core to work, which means rewriting memory and heap locking end to
+            end.</p></div>
+          </li>
+          <li>
+            <span class="ph">36</span>
+            <div><strong>Threads inside a process</strong>
+            <p>One thread per process today. Threads need a new PCB, stack and address-space
+            story first.</p></div>
+          </li>
+        </ul>
+      </article>
+
+      <article class="band">
+        <header class="band__head">
+          <span class="pill pill--far">Long term</span>
+          <h3>Radio, media, laptop</h3>
+          <p>Each of these is a project of its own, and each waits on the band above it.</p>
+        </header>
+        <ul class="band__list">
+          <li>
+            <span class="ph">37</span>
+            <div><strong>Wi-Fi</strong>
+            <p>Firmware blobs and 802.11 are where small systems stall, so this lands once wired
+            networking is solid.</p></div>
+          </li>
+          <li>
+            <span class="ph">38</span>
+            <div><strong>Audio</strong>
+            <p>No sound device is driven today.</p></div>
+          </li>
+          <li>
+            <span class="ph">39</span>
+            <div><strong>Suspend</strong>
+            <p>S3 sleep states, built on the ACPI work already landed.</p></div>
+          </li>
+          <li>
+            <span class="ph">40</span>
+            <div><strong>Battery and lid</strong>
+            <p>Power reporting and lid events for laptop use.</p></div>
+          </li>
+        </ul>
+      </article>
+
+      <article class="band">
+        <header class="band__head">
+          <span class="pill pill--vision">Vision</span>
+          <h3>Beyond the reference machine</h3>
+          <p>The far horizon: the subsystems that turn a working desktop into a general-purpose
+          platform.</p>
+        </header>
+        <ul class="band__list">
+          <li>
+            <span class="ph">41</span>
+            <div><strong>Compositor and network in Ring&nbsp;3</strong>
+            <p>Move both out of the kernel, behind inter-process communication.</p></div>
+          </li>
+          <li>
+            <span class="ph">42</span>
+            <div><strong>Declarative UI toolkit</strong>
+            <p>A higher-level toolkit for building applications, alongside the immediate-mode one.</p></div>
+          </li>
+          <li>
+            <span class="ph">43</span>
+            <div><strong>Tiling window management</strong>
+            <p>A keyboard-driven tiling layout offered next to the floating desktop.</p></div>
+          </li>
+          <li>
+            <span class="ph">44</span>
+            <div><strong>EXT4 read and write</strong>
+            <p>A second filesystem, lifting the FAT32 per-file ceiling and adding crash safety.</p></div>
+          </li>
+          <li>
+            <span class="ph">45</span>
+            <div><strong>POSIX ABI, relibc and shared objects</strong>
+            <p>Dynamic linking and a familiar ABI so software ported from elsewhere can load.</p></div>
+          </li>
+          <li>
+            <span class="ph">46</span>
+            <div><strong>IPv6</strong>
+            <p>Next-generation addressing alongside the IPv4 stack.</p></div>
+          </li>
+          <li>
+            <span class="ph">47</span>
+            <div><strong>3D GPU acceleration</strong>
+            <p>Hardware-accelerated rendering and compute beyond the software framebuffer.</p></div>
+          </li>
+          <li>
+            <span class="ph">48</span>
+            <div><strong>5-level paging and IOMMU</strong>
+            <p>A wider address space, plus DMA isolation for device drivers.</p></div>
+          </li>
+          <li>
+            <span class="ph">49</span>
+            <div><strong>HTML and CSS engine</strong>
+            <p>Extend the same engine toward full document layout and richer web content.</p></div>
+          </li>
+        </ul>
+      </article>
+
+    </div>
+  </div>
+</section>
+
+<!-- ─────────────────────────────  DOCS  ───────────────────────────── -->
+<section class="section" id="docs">
+  <div class="wrap">
+    <h2 class="section__title">Documentation</h2>
+
+    <ul class="docs">
+      <li><a href="https://github.com/coeleo-dev/coeleo-os/blob/main/docs/contrib/README.md" target="_blank" rel="noopener">Contributor index</a><span>Start here</span></li>
+      <li><a href="https://github.com/coeleo-dev/coeleo-os/blob/main/AGENTS.md" target="_blank" rel="noopener">How to write code here</a><span>Standards and contributing contracts</span></li>
+      <li><a href="https://github.com/coeleo-dev/coeleo-os/blob/main/docs/contrib/architecture.md" target="_blank" rel="noopener">Architecture</a><span>Technical map of the code</span></li>
+      <li><a href="https://github.com/coeleo-dev/coeleo-os/blob/main/docs/contrib/develop.md" target="_blank" rel="noopener">Develop</a><span>Build, test and debug workflows</span></li>
+      <li><a href="https://github.com/coeleo-dev/coeleo-os/blob/main/docs/contrib/troubleshooting.md" target="_blank" rel="noopener">Troubleshooting</a><span>Host-side failures and how to recover</span></li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer class="footer">
+  <div class="wrap footer__inner">
+    <div class="footer__brand">
+      <img src="assets/img/logo.svg" alt="" width="24" height="24">
+      <span>Coeleo OS</span>
+    </div>
+
+    <p class="footer__license">
+      Distributed under the terms of either the
+      <a href="https://github.com/coeleo-dev/coeleo-os/blob/main/LICENSE-MIT" target="_blank" rel="noopener">MIT License</a>
+      or the
+      <a href="https://github.com/coeleo-dev/coeleo-os/blob/main/LICENSE-APACHE" target="_blank" rel="noopener">Apache License 2.0</a>,
+      at your option.
+    </p>
+
+    <p class="footer__note">
+      Third-party components (Limine, Flanterm, <code>smoltcp</code>, <code>fatfs</code>,
+      <code>rustls</code> and the boot firmware the build links) keep their own licenses.
+    </p>
+
+    <p class="footer__links">
+      <a href="https://github.com/coeleo-dev/coeleo-os" target="_blank" rel="noopener">Repository</a>
+      <a href="https://github.com/coeleo-dev/coeleo-os/issues" target="_blank" rel="noopener">Issues</a>
+    </p>
+  </div>
+</footer>
+
+<div class="lightbox" id="lightbox" hidden>
+  <button class="lightbox__close" id="lbClose" aria-label="Close">&times;</button>
+  <button class="lightbox__nav lightbox__nav--prev" id="lbPrev" aria-label="Previous image">&#8249;</button>
+  <img id="lbImg" src="" alt="">
+  <button class="lightbox__nav lightbox__nav--next" id="lbNext" aria-label="Next image">&#8250;</button>
+</div>
+
+<script src="assets/js/main.js" defer></script>
+</body>
+</html>

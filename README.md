@@ -10,6 +10,7 @@ Not Linux, not Windows, not Redox, not an RTOS. The kernel, the syscall ABI, the
 
 [![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-3d8bfd.svg)](#license)
 [![Language](https://img.shields.io/badge/language-Rust%20nightly-3d8bfd.svg)](kernel/rust-toolchain.toml)
+[![Website](https://img.shields.io/badge/website-coeleo--dev.github.io-3d8bfd.svg)](https://coeleo-dev.github.io/coeleo-os/)
 
 </div>
 
