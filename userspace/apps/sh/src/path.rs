@@ -23,6 +23,11 @@ pub fn cmd_path(cmd: &str, args: &str) {
         return;
     }
     let _ = write(1, b"not found\n");
+    if let Some(sug) = crate::err::suggest_command(cmd, crate::highlight::BUILTINS) {
+        let _ = write(1, b"\x1b[1;36mdica:\x1b[0m voc\xc3\xaa quis dizer '");
+        let _ = write(1, sug.as_bytes());
+        let _ = write(1, b"'?\n");
+    }
 }
 
 pub fn cmd_run(cwd: &Cwd, args: &str) {

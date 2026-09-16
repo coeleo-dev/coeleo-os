@@ -4,7 +4,7 @@ use crate::complete;
 use crate::cwd::Cwd;
 
 pub const LINE_CAP: usize = 128;
-pub const HIST_CAP: usize = 16;
+pub const HIST_CAP: usize = 128;
 
 pub struct History {
     lines: [[u8; LINE_CAP]; HIST_CAP],
@@ -29,7 +29,36 @@ impl History {
         }
     }
 
-    fn push(&mut self, s: &[u8]) {
+    pub fn count(&self) -> usize {
+        self.count
+    }
+
+    pub fn clear(&mut self) {
+        self.count = 0;
+        self.start = 0;
+        self.view = None;
+        self.draft_len = 0;
+    }
+
+    pub fn get_at(&self, idx: usize, out: &mut [u8]) -> usize {
+        if idx >= self.count {
+            return 0;
+        }
+        let i = (self.start + idx) % HIST_CAP;
+        let n = self.lens[i];
+        out[..n].copy_from_slice(&self.lines[i][..n]);
+        n
+    }
+
+    pub fn peek_entry<'a>(&'a self, age: usize) -> Option<&'a [u8]> {
+        if age >= self.count {
+            return None;
+        }
+        let i = (self.start + self.count - 1 - age) % HIST_CAP;
+        Some(&self.lines[i][..self.lens[i]])
+    }
+
+    pub fn push(&mut self, s: &[u8]) {
         let t = trim_bytes(s);
         if t.is_empty() || t.len() > LINE_CAP {
             self.view = None;
@@ -69,7 +98,7 @@ impl History {
 enum Seq {
     Normal,
     Esc,
-    Csi,
+    Csi { buf: [u8; 8], len: usize },
 }
 
 pub fn read_line(
@@ -93,26 +122,114 @@ pub fn read_line(
         }
         match seq {
             Seq::Esc => {
-                seq = if c[0] == b'[' { Seq::Csi } else { Seq::Normal };
-                continue;
-            }
-            Seq::Csi => {
-                seq = Seq::Normal;
-                if fancy {
-                    match c[0] {
-                        b'A' => hist_up(hist, line, &mut n, &mut cur),
-                        b'B' => hist_down(hist, line, &mut n, &mut cur),
-                        b'C' => move_right(line, n, &mut cur),
-                        b'D' => move_left(&mut cur),
-                        _ => {}
+                match c[0] {
+                    b'[' => seq = Seq::Csi { buf: [0; 8], len: 0 },
+                    b'b' => {
+                        seq = Seq::Normal;
+                        if fancy {
+                            word_left(line, &mut cur);
+                        }
+                        continue;
+                    }
+                    b'f' => {
+                        seq = Seq::Normal;
+                        if fancy {
+                            word_right(line, n, &mut cur);
+                        }
+                        continue;
+                    }
+                    _ => {
+                        seq = Seq::Normal;
+                        continue;
                     }
                 }
                 continue;
+            }
+            Seq::Csi { mut buf, mut len } => {
+                let b = c[0];
+                if (0x40..=0x7E).contains(&b) {
+                    seq = Seq::Normal;
+                    if fancy {
+                        match b {
+                            b'A' => hist_up(hist, line, &mut n, &mut cur),
+                            b'B' => hist_down(hist, line, &mut n, &mut cur),
+                            b'C' => move_right(line, n, &mut cur),
+                            b'D' => move_left(&mut cur),
+                            b'H' => go_home(&mut cur),
+                            b'F' => go_to_end(line, n, &mut cur),
+                            b'~' => {
+                                match &buf[..len] {
+                                    b"3" => forward_delete(line, &mut n, cur),
+                                    b"1" => go_home(&mut cur),
+                                    b"4" => go_to_end(line, n, &mut cur),
+                                    _ => {}
+                                }
+                            }
+                            _ => {
+                                if &buf[..len] == b"1;5" {
+                                    if b == b'D' {
+                                        word_left(line, &mut cur);
+                                    } else if b == b'C' {
+                                        word_right(line, n, &mut cur);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    continue;
+                } else if len < 8 {
+                    buf[len] = b;
+                    len += 1;
+                    seq = Seq::Csi { buf, len };
+                    continue;
+                } else {
+                    seq = Seq::Normal;
+                    continue;
+                }
             }
             Seq::Normal => {}
         }
         match c[0] {
             0x1B => seq = Seq::Esc,
+            0x01 => {
+                // Ctrl+A: Home
+                if fancy {
+                    go_home(&mut cur);
+                }
+            }
+            0x05 => {
+                // Ctrl+E: End
+                if fancy {
+                    go_to_end(line, n, &mut cur);
+                }
+            }
+            0x04 => {
+                // Ctrl+D: EOF if empty line, otherwise forward delete
+                if n == 0 {
+                    return usize::MAX;
+                }
+                if fancy {
+                    forward_delete(line, &mut n, cur);
+                }
+            }
+            0x0B => {
+                // Ctrl+K: Kill to end
+                if fancy {
+                    kill_to_end(line, &mut n, cur);
+                }
+            }
+            0x14 => {
+                // Ctrl+T: Transpose characters
+                if fancy {
+                    transpose(line, n, &mut cur);
+                }
+            }
+            0x12 => {
+                // Ctrl+R: Reverse search
+                if fancy {
+                    reverse_search(hist, line, &mut n, &mut cur, prompt);
+                }
+            }
             b'\n' | b'\r' => {
                 go_end(line, n, cur);
                 let _ = write(1, b"\n");
@@ -143,12 +260,35 @@ pub fn read_line(
                     kill_to_start(line, &mut n, &mut cur);
                 }
             }
+            0x16 => {
+                if fancy {
+                    let mut clip_buf = [0u8; 4096];
+                    if let Some(clip_len) = libcoeleo::clipboard_get(&mut clip_buf) {
+                        let mut added = false;
+                        let len = clip_len.min(clip_buf.len());
+                        for &b in &clip_buf[..len] {
+                            if b >= 0x20 && b != 0x7F && n < line.len() {
+                                for i in (cur..n).rev() {
+                                    line[i + 1] = line[i];
+                                }
+                                line[cur] = b;
+                                n += 1;
+                                cur += 1;
+                                added = true;
+                            }
+                        }
+                        if added {
+                            redraw(prompt, line, n, cur);
+                        }
+                    }
+                }
+            }
             0x17 => {
                 if fancy {
                     kill_word(line, &mut n, &mut cur);
                 }
             }
-            0x08 | 0x7f => {
+            0x08 | 0x7F => {
                 hist.view = None;
                 backspace(line, &mut n, &mut cur);
             }
@@ -159,13 +299,212 @@ pub fn read_line(
                     cur = n;
                 }
             }
-            b if (b.is_ascii_graphic() || b == b' ') && n < line.len() => {
+            b if b >= 0x20 && b != 0x7F && n < line.len() => {
                 hist.view = None;
                 insert(line, &mut n, &mut cur, b);
             }
             _ => {}
         }
     }
+}
+
+fn go_home(cur: &mut usize) {
+    if *cur > 0 {
+        for _ in 0..*cur {
+            let _ = write(1, b"\x08");
+        }
+        *cur = 0;
+    }
+}
+
+fn go_to_end(line: &[u8], n: usize, cur: &mut usize) {
+    if *cur < n {
+        let _ = write(1, &line[*cur..n]);
+        *cur = n;
+    }
+}
+
+fn forward_delete(line: &mut [u8], n: &mut usize, cur: usize) {
+    if cur < *n {
+        *n -= 1;
+        for i in cur..*n {
+            line[i] = line[i + 1];
+        }
+        if cur < *n {
+            let _ = write(1, &line[cur..*n]);
+        }
+        let _ = write(1, b" \x08");
+        for _ in 0..(*n - cur) {
+            let _ = write(1, b"\x08");
+        }
+    }
+}
+
+fn kill_to_end(_line: &mut [u8], n: &mut usize, cur: usize) {
+    if cur < *n {
+        let drop = *n - cur;
+        for _ in 0..drop {
+            let _ = write(1, b" ");
+        }
+        for _ in 0..drop {
+            let _ = write(1, b"\x08");
+        }
+        *n = cur;
+    }
+}
+
+fn transpose(line: &mut [u8], n: usize, cur: &mut usize) {
+    if *cur >= 2 && *cur <= n {
+        let a = line[*cur - 2];
+        let b = line[*cur - 1];
+        line[*cur - 2] = b;
+        line[*cur - 1] = a;
+        let _ = write(1, b"\x08\x08");
+        let _ = write(1, &[b, a]);
+    }
+}
+
+fn word_left(line: &[u8], cur: &mut usize) {
+    if *cur == 0 {
+        return;
+    }
+    let mut i = *cur;
+    while i > 0 && line[i - 1] == b' ' {
+        i -= 1;
+    }
+    while i > 0 && line[i - 1] != b' ' {
+        i -= 1;
+    }
+    for _ in 0..(*cur - i) {
+        let _ = write(1, b"\x08");
+    }
+    *cur = i;
+}
+
+fn word_right(line: &[u8], n: usize, cur: &mut usize) {
+    if *cur >= n {
+        return;
+    }
+    let mut i = *cur;
+    while i < n && line[i] == b' ' {
+        i += 1;
+    }
+    while i < n && line[i] != b' ' {
+        i += 1;
+    }
+    let _ = write(1, &line[*cur..i]);
+    *cur = i;
+}
+
+fn reverse_search(
+    hist: &History,
+    line: &mut [u8],
+    n: &mut usize,
+    cur: &mut usize,
+    prompt: &[u8],
+) {
+    let mut query = [0u8; 32];
+    let mut qlen = 0usize;
+    let mut match_idx: Option<usize> = None;
+    let mut original = [0u8; LINE_CAP];
+    original[..*n].copy_from_slice(&line[..*n]);
+    let orig_n = *n;
+
+    loop {
+        // Redraw reverse search prompt
+        let _ = write(1, b"\r\x1b[K(reverse-i-search)`");
+        if qlen > 0 {
+            let _ = write(1, &query[..qlen]);
+        }
+        let _ = write(1, b"': ");
+        if let Some(idx) = match_idx {
+            let mut tmp = [0u8; LINE_CAP];
+            let len = hist.get_at(idx, &mut tmp);
+            let _ = write(1, &tmp[..len]);
+        }
+
+        let mut c = [0u8; 1];
+        let r = libcoeleo::read(0, &mut c);
+        if r == 0 || r == ERR {
+            break;
+        }
+        match c[0] {
+            0x12 => {
+                // Ctrl+R: search earlier match
+                if let Some(cur_idx) = match_idx {
+                    if cur_idx > 0 {
+                        match_idx = find_match(hist, &query[..qlen], cur_idx - 1);
+                    }
+                }
+            }
+            0x08 | 0x7F => {
+                if qlen > 0 {
+                    qlen -= 1;
+                    match_idx = if qlen > 0 {
+                        find_match(hist, &query[..qlen], hist.count().saturating_sub(1))
+                    } else {
+                        None
+                    };
+                }
+            }
+            0x1B | 0x03 | 0x07 => {
+                // Cancel
+                line[..orig_n].copy_from_slice(&original[..orig_n]);
+                *n = orig_n;
+                *cur = orig_n;
+                redraw(prompt, line, *n, *cur);
+                return;
+            }
+            b'\n' | b'\r' => {
+                if let Some(idx) = match_idx {
+                    let mut tmp = [0u8; LINE_CAP];
+                    let len = hist.get_at(idx, &mut tmp);
+                    line[..len].copy_from_slice(&tmp[..len]);
+                    *n = len;
+                    *cur = len;
+                }
+                redraw(prompt, line, *n, *cur);
+                return;
+            }
+            b if b >= 0x20 && b != 0x7F && qlen < query.len() => {
+                query[qlen] = b;
+                qlen += 1;
+                match_idx = find_match(hist, &query[..qlen], hist.count().saturating_sub(1));
+            }
+            _ => {}
+        }
+    }
+}
+
+fn find_match(hist: &History, query: &[u8], start_idx: usize) -> Option<usize> {
+    if query.is_empty() || hist.count() == 0 {
+        return None;
+    }
+    let mut tmp = [0u8; LINE_CAP];
+    let limit = start_idx.min(hist.count().saturating_sub(1));
+    for i in (0..=limit).rev() {
+        let len = hist.get_at(i, &mut tmp);
+        let entry = &tmp[..len];
+        if contains_subslice(entry, query) {
+            return Some(i);
+        }
+    }
+    None
+}
+
+fn contains_subslice(haystack: &[u8], needle: &[u8]) -> bool {
+    if needle.is_empty() {
+        return true;
+    }
+    if haystack.len() < needle.len() {
+        return false;
+    }
+    for i in 0..=(haystack.len() - needle.len()) {
+        if &haystack[i..i + needle.len()] == needle {
+            return true;
+        }
+    }
+    false
 }
 
 fn hist_up(hist: &mut History, line: &mut [u8], n: &mut usize, cur: &mut usize) {

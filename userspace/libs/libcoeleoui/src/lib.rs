@@ -3,7 +3,10 @@
 #![no_std]
 
 use coeleo_draw::{self, Clip, Icon, Target};
-use coeleo_theme::{BG, DANGER, DIM, HIGHLIGHT, PAD, RADIUS_SM, SURFACE, TEXT};
+use coeleo_theme::{
+    ACCENT, BG, BORDER, BORDER_LIGHT, DANGER, DIM, HIGHLIGHT, HOVER, PAD, RADIUS_SM, SURFACE,
+    SURFACE_RAISED, TEXT,
+};
 
 const KIND_MOVE: u32 = 1;
 const KIND_DOWN: u32 = 2;
@@ -70,15 +73,23 @@ impl Ui {
     }
 
     pub fn button(&mut self, x: u32, y: u32, w: u32, h: u32, s: &str) -> bool {
-        self.button_en(x, y, w, h, s, SURFACE, TEXT, true)
+        self.button_secondary(x, y, w, h, s)
+    }
+
+    pub fn button_primary(&mut self, x: u32, y: u32, w: u32, h: u32, s: &str) -> bool {
+        self.button_stroke(x, y, w, h, s, ACCENT, BORDER_LIGHT, 0x00FF_FFFF, true)
+    }
+
+    pub fn button_secondary(&mut self, x: u32, y: u32, w: u32, h: u32, s: &str) -> bool {
+        self.button_stroke(x, y, w, h, s, SURFACE, BORDER, TEXT, true)
     }
 
     pub fn button_fill(&mut self, x: u32, y: u32, w: u32, h: u32, s: &str, fill: u32) -> bool {
-        self.button_en(x, y, w, h, s, fill, TEXT, true)
+        self.button_stroke(x, y, w, h, s, fill, BORDER, TEXT, true)
     }
 
     pub fn button_danger(&mut self, x: u32, y: u32, w: u32, h: u32, s: &str) -> bool {
-        self.button_en(x, y, w, h, s, SURFACE, DANGER, true)
+        self.button_stroke(x, y, w, h, s, SURFACE, DANGER, DANGER, true)
     }
 
     pub fn button_en(
@@ -92,20 +103,35 @@ impl Ui {
         fg: u32,
         enabled: bool,
     ) -> bool {
+        self.button_stroke(x, y, w, h, s, fill, BORDER, fg, enabled)
+    }
+
+    pub fn button_stroke(
+        &mut self,
+        x: u32,
+        y: u32,
+        w: u32,
+        h: u32,
+        s: &str,
+        fill: u32,
+        stroke: u32,
+        fg: u32,
+        enabled: bool,
+    ) -> bool {
         let hit = enabled && self.down_in(x, y, w, h);
         let hover = enabled && self.pos_in(x, y, w, h);
         let t = self.target();
         let clip = self.clip();
-        let bg = if !enabled {
-            fill
+        let (bg, border) = if !enabled {
+            (fill, stroke)
         } else if hit {
-            HIGHLIGHT
+            (HIGHLIGHT, ACCENT)
         } else if hover {
-            coeleo_theme::HOVER
+            (HOVER, BORDER_LIGHT)
         } else {
-            fill
+            (fill, stroke)
         };
-        coeleo_draw::fill_round(t, x, y, w, h, RADIUS_SM, bg, clip);
+        coeleo_draw::fill_stroke_round(t, x, y, w, h, RADIUS_SM, bg, border, clip);
         let color = if enabled { fg } else { DIM };
         let tw = coeleo_draw::text_width(s);
         let tx = x.saturating_add(w.saturating_sub(tw) / 2);

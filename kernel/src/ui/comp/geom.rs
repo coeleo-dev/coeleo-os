@@ -47,10 +47,19 @@ pub(super) fn frame_title(kind: FrameKind) -> &'static str {
     }
 }
 
+pub(super) fn frame_icon(kind: FrameKind) -> Icon {
+    match kind {
+        FrameKind::Vt => Icon::Terminal,
+        FrameKind::Files => Icon::Folder,
+        _ => Icon::App,
+    }
+}
+
 pub(super) fn app_label(name: &str) -> &str {
     match name {
         "files" => "Files",
         "sh" => "Terminal",
+        "settings" => "Settings",
         "hello" => "Hello",
         "widgets" => "Widgets",
         "winprobe" => "Winprobe",

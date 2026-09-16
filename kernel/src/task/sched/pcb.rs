@@ -6,12 +6,15 @@ use x86_64::structures::paging::{PhysFrame, Size4KiB};
 use crate::elfload::Image;
 use crate::fd::FdTable;
 
-pub const MAX_PROC: usize = 4;
-pub(super) const KSTACK_SIZE: usize = 16 * 1024;
+pub const MAX_PROC: usize = 8;
+// 16 KiB was not enough: the wallpaper PNG decode (zune-png) runs inline in
+// comp::poll, deep under a read syscall, and its call chain overflows the
+// stack, silently corrupting the scheduler statics just below KSTACKS[0].
+pub(super) const KSTACK_SIZE: usize = 64 * 1024;
 pub(super) const ERR: u64 = u64::MAX;
 pub(super) const PS_REC: usize = 16;
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum State {
     Runnable,
     Running,

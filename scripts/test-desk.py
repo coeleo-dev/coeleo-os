@@ -20,12 +20,13 @@ WALL = os.path.join(ROOT, "docs", "image", "wallpaper.jpg")
 
 # Empty work, away from launcher/KRunner/task slots (29/65/101) and boot frames.
 EMPTY = (400, 200)
-# Settings frame (80, 40) + DECO_H(32). Mode row PAD+ROW_H (8+22), BTN_H 24.
-# Full button: x1 = PAD*2 + (360-PAD*3)/2 = 184; click (80+184+8, 40+32+30+8).
-FULL_BTN = (272, 112)
-FLOAT_BTN = (112, 112)
-# Wallpaper list y0 = PAD+ROW_H+BTN_H+PAD+ROW_H = 84; row 1 (first jpg) + 8.
-WALL_ROW = (96, 192)
+# Settings frame origin (60, 36) + DECO_H (32) -> content at (60, 68). Coordinates
+# mirror kernel/src/ui/deskset.rs::layout(520, 400): mode row at y=37, grid at
+# y=119 with 109-tall cards, so the buttons/cards below are their centres.
+FULL_BTN = (446, 117)
+FLOAT_BTN = (194, 117)
+# Card row 0, col 0 ("Default"); whole card is the hit target.
+WALL_CARD = (154, 241)
 
 
 def recv_json(sock: socket.socket) -> dict:
@@ -289,7 +290,7 @@ def main() -> int:
                 if "panel: float" not in serial:
                     return fail("Float button did not log panel: float", serial)
 
-                go(sock, WALL_ROW[0], WALL_ROW[1])
+                go(sock, WALL_CARD[0], WALL_CARD[1])
                 send_click(sock, "left")
                 serial = wait_count(serial_log, "desk: wallpaper", wall0 + 1, 8)
                 if serial.count("desk: wallpaper") < wall0 + 1:

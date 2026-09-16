@@ -27,6 +27,28 @@ pub fn write_str(s: &str) {
     let _ = SERIAL.lock().write_str(s);
 }
 
+#[allow(dead_code)]
+pub fn write_fmt(args: core::fmt::Arguments) {
+    let _ = SERIAL.lock().write_fmt(args);
+}
+
+#[macro_export]
+macro_rules! serial_print {
+    ($($arg:tt)*) => {
+        $crate::serial::write_fmt(format_args!($($arg)*))
+    };
+}
+
+#[macro_export]
+macro_rules! serial_println {
+    () => {
+        $crate::serial::write_str("\n")
+    };
+    ($($arg:tt)*) => {
+        $crate::serial::write_fmt(format_args!("{}\n", format_args!($($arg)*)))
+    };
+}
+
 pub fn write_dec_u32(n: u32) {
     if n == 0 {
         write_str("0");

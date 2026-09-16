@@ -46,13 +46,32 @@ pub extern "C" fn _start(argc: usize, argv: *const *const u8) -> ! {
                     paint(&buf, n);
                 }
             }
+            0x03 => {
+                libcoeleo::clipboard_set(&buf[..n]);
+            }
+            0x16 => {
+                let mut clip = [0u8; CAP];
+                if let Some(clip_len) = libcoeleo::clipboard_get(&mut clip) {
+                    let mut added = false;
+                    for &b in &clip[..clip_len.min(CAP)] {
+                        if b >= 0x20 && b != 0x7F || b == b'\n' {
+                            if insert(&mut buf, &mut n, b) {
+                                added = true;
+                            }
+                        }
+                    }
+                    if added {
+                        paint(&buf, n);
+                    }
+                }
+            }
             0x08 | 0x7f => {
                 if n > 0 {
                     n -= 1;
                     paint(&buf, n);
                 }
             }
-            b if b.is_ascii_graphic() || b == b' ' => {
+            b if b >= 0x20 && b != 0x7F => {
                 if insert(&mut buf, &mut n, b) {
                     paint(&buf, n);
                 }
@@ -126,7 +145,9 @@ fn paint(buf: &[u8], n: usize) {
     if n == 0 || buf[n - 1] != b'\n' {
         let _ = write(1, b"\n");
     }
+    let _ = write(1, b"\x1b[7m");
     let _ = write(1, STATUS);
+    let _ = write(1, b"\x1b[0m");
 }
 
 fn skip_csi() {

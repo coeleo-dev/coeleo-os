@@ -71,6 +71,7 @@ pub fn sys_install(n: u64) -> u64 {
         Step::Armed => 1,
         Step::Ok => {
             crate::serial::write_str("install: ok\n");
+            crate::ui::comp::notify("install: ok");
             0
         }
         Step::Failed => {

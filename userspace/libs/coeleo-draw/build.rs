@@ -23,11 +23,16 @@ fn main() {
     let mut min_ymin = 0i32;
     let mut max_xmax = 1i32;
     let mut max_ymax = 1i32;
-    let mut advances = [1u8; 95];
-    for ch in 32u8..127 {
-        let (m, bitmap) = font.rasterize(ch as char, PX);
+    let mut advances = [1u8; 256];
+    for ch in 0u16..=255 {
+        let render_ch = if ch < 32 || (ch > 126 && ch < 160) {
+            '?'
+        } else {
+            char::from_u32(ch as u32).unwrap_or('?')
+        };
+        let (m, bitmap) = font.rasterize(render_ch, PX);
         let adv = m.advance_width.round().clamp(1.0, 24.0) as u8;
-        advances[(ch - 32) as usize] = adv;
+        advances[ch as usize] = adv;
         if m.width > 0 && m.height > 0 {
             min_xmin = min_xmin.min(m.xmin);
             min_ymin = min_ymin.min(m.ymin);
@@ -51,7 +56,7 @@ fn main() {
     out.push_str(&width.to_string());
     out.push_str(";\npub const HEIGHT: u32 = ");
     out.push_str(&height.to_string());
-    out.push_str(";\npub static ADVANCE: [u8; 95] = [");
+    out.push_str(";\npub static ADVANCE: [u8; 256] = [");
     for (i, a) in advances.iter().enumerate() {
         if i > 0 {
             out.push(',');
@@ -60,7 +65,7 @@ fn main() {
     }
     out.push_str("];\npub static GLYPHS: [[u8; ");
     out.push_str(&(width * height).to_string());
-    out.push_str("]; 95] = [\n");
+    out.push_str("]; 256] = [\n");
 
     for (metrics, bitmap) in &rasters {
         let cell = pack_cell(metrics, bitmap, place);

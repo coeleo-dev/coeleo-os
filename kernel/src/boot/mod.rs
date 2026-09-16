@@ -3,6 +3,7 @@ pub mod console;
 pub mod gdt;
 pub mod init;
 pub mod interrupts;
+pub mod kdebug;
 pub mod lapic;
 pub mod rtc;
 pub mod serial;

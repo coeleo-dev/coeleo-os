@@ -215,6 +215,18 @@ pub fn poll() {
     net.poll_inner();
 }
 
+pub fn is_up() -> bool {
+    let guard = NET.lock();
+    let Some(net) = guard.as_ref() else {
+        return false;
+    };
+    matches!(net.lease, dhcp::Lease::Leased(_) | dhcp::Lease::Static)
+}
+
+pub fn has_nic() -> bool {
+    NET.lock().is_some()
+}
+
 pub fn parse_ipv4(s: &str) -> Option<Ipv4Address> {
     let mut oct = [0u8; 4];
     let mut n = 0usize;

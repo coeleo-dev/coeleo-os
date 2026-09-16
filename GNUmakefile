@@ -93,7 +93,7 @@ run-ahci: edk2-ovmf $(IMAGE_NAME).iso ensure-ahci-disk
 		-M q35 \
 		-drive if=pflash,unit=0,format=raw,file=edk2-ovmf/ovmf-code-x86_64.fd,readonly=on \
 		-cdrom $(IMAGE_NAME).iso \
-		-hda $(AHCI_IMG) \
+		-drive file=$(AHCI_IMG),if=ide,format=raw \
 		$(VIRTIO_NET) \
 		$(USB_MOUSE) \
 		$(QEMUFLAGS)
@@ -205,7 +205,7 @@ $(DISK_IMG): userspace
 	dd if=/dev/zero of=$@ bs=1M count=$(DISK_MIB)
 	MTOOLS_SKIP_CHECK=1 mformat -i $@ -F -c 1 -v COELEO ::
 	MTOOLS_SKIP_CHECK=1 mcopy -i $@ disk-seed/README.TXT ::README.TXT
-	MTOOLS_SKIP_CHECK=1 mmd -i $@ ::docs ::bin ::pacotes
+	MTOOLS_SKIP_CHECK=1 mmd -i $@ ::docs ::bin ::pacotes ::wallpapers
 	MTOOLS_SKIP_CHECK=1 mcopy -i $@ disk-seed/docs/HELLO.TXT ::docs/HELLO.TXT
 	MTOOLS_SKIP_CHECK=1 mcopy -i $@ userspace/apps/hello/hello ::hello
 	MTOOLS_SKIP_CHECK=1 mcopy -i $@ userspace/apps/fault/fault ::fault
@@ -220,6 +220,7 @@ $(DISK_IMG): userspace
 	MTOOLS_SKIP_CHECK=1 mcopy -i $@ userspace/apps/widgets/widgets ::widgets
 	MTOOLS_SKIP_CHECK=1 mcopy -i $@ userspace/apps/install/install ::install
 	MTOOLS_SKIP_CHECK=1 mcopy -i $@ userspace/libs/pkg/hello.coe ::pacotes/hello.coe
+	MTOOLS_SKIP_CHECK=1 mcopy -i $@ disk-seed/wallpapers/*.png ::wallpapers/
 
 .PHONY: ensure-fat32-disk
 ensure-fat32-disk: userspace
@@ -228,6 +229,7 @@ ensure-fat32-disk: userspace
 		&& MTOOLS_SKIP_CHECK=1 mdir -i $(DISK_IMG) :: >/dev/null 2>&1; then \
 		MTOOLS_SKIP_CHECK=1 mmd -D s -i $(DISK_IMG) ::bin || true; \
 		MTOOLS_SKIP_CHECK=1 mmd -D s -i $(DISK_IMG) ::pacotes || true; \
+		MTOOLS_SKIP_CHECK=1 mmd -D s -i $(DISK_IMG) ::wallpapers || true; \
 		MTOOLS_SKIP_CHECK=1 mcopy -o -i $(DISK_IMG) userspace/apps/hello/hello ::hello \
 		&& MTOOLS_SKIP_CHECK=1 mcopy -o -i $(DISK_IMG) userspace/apps/fault/fault ::fault \
 		&& MTOOLS_SKIP_CHECK=1 mcopy -o -i $(DISK_IMG) userspace/apps/sh/sh ::sh \
@@ -241,6 +243,7 @@ ensure-fat32-disk: userspace
 		&& MTOOLS_SKIP_CHECK=1 mcopy -o -i $(DISK_IMG) userspace/apps/widgets/widgets ::widgets \
 		&& MTOOLS_SKIP_CHECK=1 mcopy -o -i $(DISK_IMG) userspace/apps/install/install ::install \
 		&& MTOOLS_SKIP_CHECK=1 mcopy -o -i $(DISK_IMG) userspace/libs/pkg/hello.coe ::pacotes/hello.coe \
+		&& MTOOLS_SKIP_CHECK=1 mcopy -o -i $(DISK_IMG) disk-seed/wallpapers/*.png ::wallpapers/ \
 		&& ok=1; \
 	fi; \
 	if [ $$ok -eq 0 ]; then \
@@ -254,7 +257,7 @@ $(AHCI_IMG): userspace kernel
 	sgdisk $@ -n 1:2048 -t 1:0700
 	MTOOLS_SKIP_CHECK=1 mformat -i $@@@1M -F -c 1 -v COELEO ::
 	MTOOLS_SKIP_CHECK=1 mcopy -i $@@@1M disk-seed/README.TXT ::README.TXT
-	MTOOLS_SKIP_CHECK=1 mmd -i $@@@1M ::docs ::bin ::pacotes ::/boot ::/boot/limine ::/EFI ::/EFI/BOOT
+	MTOOLS_SKIP_CHECK=1 mmd -i $@@@1M ::docs ::bin ::pacotes ::wallpapers ::/boot ::/boot/limine ::/EFI ::/EFI/BOOT
 	MTOOLS_SKIP_CHECK=1 mcopy -i $@@@1M disk-seed/docs/HELLO.TXT ::docs/HELLO.TXT
 	MTOOLS_SKIP_CHECK=1 mcopy -i $@@@1M kernel/kernel ::/boot/kernel
 	MTOOLS_SKIP_CHECK=1 mcopy -i $@@@1M limine.conf ::/boot/limine/limine.conf
@@ -274,6 +277,7 @@ $(AHCI_IMG): userspace kernel
 	MTOOLS_SKIP_CHECK=1 mcopy -i $@@@1M userspace/apps/widgets/widgets ::widgets
 	MTOOLS_SKIP_CHECK=1 mcopy -i $@@@1M userspace/apps/install/install ::install
 	MTOOLS_SKIP_CHECK=1 mcopy -i $@@@1M userspace/libs/pkg/hello.coe ::pacotes/hello.coe
+	MTOOLS_SKIP_CHECK=1 mcopy -i $@@@1M disk-seed/wallpapers/*.png ::wallpapers/
 
 .PHONY: ensure-ahci-disk
 ensure-ahci-disk: userspace kernel
@@ -282,6 +286,7 @@ ensure-ahci-disk: userspace kernel
 		&& MTOOLS_SKIP_CHECK=1 mdir -i $(AHCI_IMG)@@1M :: >/dev/null 2>&1; then \
 		MTOOLS_SKIP_CHECK=1 mmd -D s -i $(AHCI_IMG)@@1M ::bin || true; \
 		MTOOLS_SKIP_CHECK=1 mmd -D s -i $(AHCI_IMG)@@1M ::pacotes || true; \
+		MTOOLS_SKIP_CHECK=1 mmd -D s -i $(AHCI_IMG)@@1M ::wallpapers || true; \
 		MTOOLS_SKIP_CHECK=1 mmd -D s -i $(AHCI_IMG)@@1M ::/boot ::/boot/limine ::/EFI ::/EFI/BOOT || true; \
 		MTOOLS_SKIP_CHECK=1 mcopy -o -i $(AHCI_IMG)@@1M userspace/apps/hello/hello ::hello \
 		&& MTOOLS_SKIP_CHECK=1 mcopy -o -i $(AHCI_IMG)@@1M userspace/apps/fault/fault ::fault \
@@ -296,6 +301,7 @@ ensure-ahci-disk: userspace kernel
 		&& MTOOLS_SKIP_CHECK=1 mcopy -o -i $(AHCI_IMG)@@1M userspace/apps/widgets/widgets ::widgets \
 		&& MTOOLS_SKIP_CHECK=1 mcopy -o -i $(AHCI_IMG)@@1M userspace/apps/install/install ::install \
 		&& MTOOLS_SKIP_CHECK=1 mcopy -o -i $(AHCI_IMG)@@1M userspace/libs/pkg/hello.coe ::pacotes/hello.coe \
+		&& MTOOLS_SKIP_CHECK=1 mcopy -o -i $(AHCI_IMG)@@1M disk-seed/wallpapers/*.png ::wallpapers/ \
 		&& MTOOLS_SKIP_CHECK=1 mcopy -o -i $(AHCI_IMG)@@1M kernel/kernel ::/boot/kernel \
 		&& MTOOLS_SKIP_CHECK=1 mcopy -o -i $(AHCI_IMG)@@1M limine.conf ::/boot/limine/limine.conf \
 		&& MTOOLS_SKIP_CHECK=1 mcopy -o -i $(AHCI_IMG)@@1M limine/limine-bios.sys ::/boot/limine/limine-bios.sys \

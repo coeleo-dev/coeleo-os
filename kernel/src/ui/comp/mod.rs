@@ -1,6 +1,7 @@
 //! Software compositor: stacked windows, deco, short shadow, dirty cursor.
 
 mod chrome;
+pub mod clip;
 mod cursor;
 mod damage;
 mod fb;
@@ -163,6 +164,8 @@ pub fn init() {
         runner_caret: true,
         title_click_at: 0,
         title_click_kind: None,
+        toast: alloc::string::String::new(),
+        toast_at: 0,
     };
     fill_work(&mut st);
     paint_all_frames(&mut st, true);
@@ -226,7 +229,7 @@ pub fn irq_runner_char(b: u8) -> bool {
     if !RUNNER_OPEN.load(Ordering::Acquire) {
         return false;
     }
-    if (0x20..=0x7E).contains(&b) {
+    if b >= 0x20 && b != 0x7F {
         push_key(b);
     }
     true
@@ -240,7 +243,7 @@ pub fn irq_files_char(b: u8) -> bool {
         return false;
     }
     if FOCUS_DESK.load(Ordering::Acquire) {
-        if (0x20..=0x7E).contains(&b) {
+        if b >= 0x20 && b != 0x7F {
             push_key(b);
             return true;
         }
@@ -249,8 +252,11 @@ pub fn irq_files_char(b: u8) -> bool {
     if !FOCUS_FILES.load(Ordering::Acquire) {
         return false;
     }
-    if (0x20..=0x7E).contains(&b) {
+    if b >= 0x20 && b != 0x7F {
         push_key(b);
+        return true;
+    } else if b == 0x03 {
+        push_key(state::KEY_COPY);
         return true;
     }
     false
@@ -454,6 +460,7 @@ pub fn on_client_create(id: u32, cw: u32, ch: u32, ox: u32, oy: u32) {
     let Some(st) = g.as_mut() else {
         return;
     };
+    let old_top = visible_top(st);
     let seq = st.seq_next;
     st.seq_next = st.seq_next.saturating_add(1);
     st.frames
@@ -461,6 +468,9 @@ pub fn on_client_create(id: u32, cw: u32, ch: u32, ox: u32, oy: u32) {
     set_focus(st, Focus::Term);
     sync_client_top(st);
     undraw_cursor(st);
+    if let Some(ot) = old_top {
+        present_damage(st, shadow_rect(&st.frames[ot]), true);
+    }
     present_damage(st, shadow_rect(&st.frames[st.frames.len() - 1]), true);
     paint_strut(st);
     draw_cursor(st);
@@ -538,6 +548,13 @@ fn pop_key() -> Option<u8> {
     Some(k)
 }
 
+pub fn notify(msg: &str) {
+    let mut g = STATE.lock();
+    if let Some(st) = g.as_mut() {
+        chrome::show_toast(st, msg);
+    }
+}
+
 pub fn poll() {
     if !READY.load(Ordering::Acquire) {
         return;
@@ -550,6 +567,13 @@ pub fn poll() {
     {
         let mut g = STATE.lock();
         if let Some(st) = g.as_mut() {
+            let t = crate::clock::ticks();
+            if !st.toast.is_empty() && t.saturating_sub(st.toast_at) > 30 {
+                st.toast.clear();
+                let w = st.fb.w; // or just request full repaint of that bottom area
+                let y = panel::work_h(st.fb.h).saturating_sub(40);
+                present_damage(st, rect::Rect { x0: 0, y0: y, x1: w, y1: y + 32 }, true);
+            }
             if tick_runner_caret(st) {
                 undraw_cursor(st);
                 draw_cursor(st);
@@ -721,7 +745,13 @@ pub fn poll() {
                 Hit::Min(i) => minimize_frame(st, i),
                 Hit::Max(i) => toggle_max(st, i),
                 Hit::Title(i) => {
+                    let old_top = visible_top(st);
                     raise_visible(st, i);
+                    if let Some(ot) = old_top {
+                        if ot != i {
+                            present_damage(st, shadow_rect(&st.frames[ot]), false);
+                        }
+                    }
                     let i = st.frames.len() - 1;
                     let t = crate::clock::ticks();
                     let kind = st.frames[i].kind;
@@ -753,7 +783,13 @@ pub fn poll() {
                     paint_strut(st);
                 }
                 Hit::Resize(i, edge) => {
+                    let old_top = visible_top(st);
                     raise_visible(st, i);
+                    if let Some(ot) = old_top {
+                        if ot != i {
+                            present_damage(st, shadow_rect(&st.frames[ot]), false);
+                        }
+                    }
                     let f = st.frames[st.frames.len() - 1];
                     if !f.maximized {
                         st.drag_at = 0;
@@ -773,7 +809,13 @@ pub fn poll() {
                     paint_strut(st);
                 }
                 Hit::Client(i) => {
+                    let old_top = visible_top(st);
                     raise_visible(st, i);
+                    if let Some(ot) = old_top {
+                        if ot != i {
+                            present_damage(st, shadow_rect(&st.frames[ot]), false);
+                        }
+                    }
                     match st.frames[st.frames.len() - 1].kind {
                         FrameKind::Vt => {
                             set_focus(st, Focus::Term);
@@ -806,7 +848,7 @@ pub fn poll() {
                             let lx = x.saturating_sub(last.ox);
                             let ly = y.saturating_sub(last.oy.saturating_add(DECO_H));
                             drop(g);
-                            let a = crate::deskset::click_at(lx, ly, last.cw);
+                            let a = crate::deskset::click_at(lx, ly, last.cw, last.ch);
                             apply_desk_action(a);
                             refresh_settings();
                             return;
@@ -1054,6 +1096,9 @@ fn apply_key(k: u8) {
         c if c >= 32 => {
             fm::search_push(c);
             refresh_files();
+        }
+        state::KEY_COPY => {
+            fm::copy_path();
         }
         _ => {}
     }
@@ -1340,7 +1385,7 @@ pub fn irq_client_char(b: u8) -> bool {
     if !client_on_top() {
         return false;
     }
-    if (0x20..=0x7E).contains(&b) {
+    if b >= 0x20 && b != 0x7F {
         push_key(b);
         return true;
     }

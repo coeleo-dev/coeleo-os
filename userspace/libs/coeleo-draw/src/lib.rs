@@ -6,8 +6,8 @@
 pub mod font;
 
 use coeleo_theme::{
-    ACCENT, BG, BUTTON_H, DANGER, DIM, GAP, HIGHLIGHT, HOVER, OVERLAY, OVERLAY_ALPHA, PAD,
-    RADIUS_SM, SHADOW, SURFACE, TEXT,
+    ACCENT, BG, BORDER, BORDER_LIGHT, BUTTON_H, DANGER, DIM, GAP, HIGHLIGHT, HOVER, OVERLAY,
+    OVERLAY_ALPHA, PAD, RADIUS_SM, SHADOW, SURFACE, SURFACE_RAISED, TEXT,
 };
 
 /// Glyph cell width (blit). Prefer [`text_width`] for layout.
@@ -17,7 +17,42 @@ pub const ICON: u32 = 16;
 pub const ROW: u32 = FONT_H + GAP;
 
 pub fn text_width(s: &str) -> u32 {
-    s.bytes().map(font::advance).fold(0u32, u32::saturating_add)
+    s.chars()
+        .map(|c| {
+            let u = c as u32;
+            if u > 255 { b'?' } else { u as u8 }
+        })
+        .map(font::advance)
+        .fold(0u32, u32::saturating_add)
+}
+
+/// Horizontal bounds of the visible ink of `s`, relative to the draw origin:
+/// `(left, right)`, `right` exclusive. [`text_width`] measures the advance box,
+/// which carries the left side bearing of the first glyph and the right bearing
+/// of the last, so a label centred on it looks pushed to the right.
+pub fn text_ink(s: &str) -> (u32, u32) {
+    let mut pen = 0u32;
+    let mut left = u32::MAX;
+    let mut right = 0u32;
+    for ch in s.chars() {
+        let u = ch as u32;
+        let c = if u > 255 { b'?' } else { u as u8 };
+        for gy in 0..FONT_H {
+            for gx in 0..FONT_W {
+                if font::coverage(c, gx, gy) == 0 {
+                    continue;
+                }
+                left = left.min(pen.saturating_add(gx));
+                right = right.max(pen.saturating_add(gx).saturating_add(1));
+            }
+        }
+        pen = pen.saturating_add(font::advance(c));
+    }
+    if left == u32::MAX {
+        (0, 0)
+    } else {
+        (left, right)
+    }
 }
 
 const SDF_S: i32 = 8;
@@ -65,6 +100,7 @@ pub enum Icon {
     Up,
     Min,
     Max,
+    Network,
 }
 
 pub fn put(t: Target, x: u32, y: u32, color: u32) {
@@ -144,6 +180,27 @@ fn isqrt(n: i32) -> i32 {
 /// Signed distance in 1/8 px; negative inside the rounded rect.
 pub fn coverage_round(px: u32, py: u32, rx: u32, ry: u32, rw: u32, rh: u32, radius: u32) -> u8 {
     aa_from_d8(sdf8(px, py, rx, ry, rw, rh, radius))
+}
+
+/// Anti-aliased coverage for a 1px hairline stroke along the perimeter of a rounded rect.
+pub fn stroke_coverage_round(
+    px: u32,
+    py: u32,
+    rx: u32,
+    ry: u32,
+    rw: u32,
+    rh: u32,
+    radius: u32,
+) -> u8 {
+    let d = sdf8(px, py, rx, ry, rw, rh, radius);
+    let delta = (d + 4).abs();
+    if delta <= 3 {
+        255
+    } else if delta >= 9 {
+        0
+    } else {
+        (((9 - delta) * 255) / 6) as u8
+    }
 }
 
 fn aa_from_d8(d8: i32) -> u8 {
@@ -367,21 +424,8 @@ pub fn query_field(
     search_icon: bool,
     clip: Clip,
 ) {
-    if show_caret {
-        fill_round(t, x, y, w, h, RADIUS_SM, ACCENT, clip);
-        fill_round(
-            t,
-            x.saturating_add(1),
-            y.saturating_add(1),
-            w.saturating_sub(2),
-            h.saturating_sub(2),
-            RADIUS_SM,
-            BG,
-            clip,
-        );
-    } else {
-        fill_round(t, x, y, w, h, RADIUS_SM, BG, clip);
-    }
+    let border = if show_caret { ACCENT } else { BORDER };
+    fill_stroke_round(t, x, y, w, h, RADIUS_SM, BG, border, clip);
     let mut tx = x.saturating_add(PAD / 2);
     if search_icon {
         icon(
@@ -389,7 +433,7 @@ pub fn query_field(
             Icon::Search,
             tx,
             y + (h.saturating_sub(ICON)) / 2,
-            DIM,
+            if show_caret { ACCENT } else { DIM },
             clip,
         );
         tx = tx.saturating_add(ICON);
@@ -427,6 +471,50 @@ pub fn list_row(
     list_row_fg(
         t, x, y, w, h, label, icon_which, selected, hovered, TEXT, clip,
     );
+}
+
+pub fn list_row_badge(
+    t: Target,
+    x: u32,
+    y: u32,
+    w: u32,
+    h: u32,
+    label: &str,
+    badge: Option<&str>,
+    icon_which: Option<Icon>,
+    selected: bool,
+    hovered: bool,
+    clip: Clip,
+) {
+    let fx = x.saturating_add(2);
+    let fy = y.saturating_add(1);
+    let fw = w.saturating_sub(4);
+    let fh = h.saturating_sub(2);
+    if selected {
+        highlight_fill(t, fx, fy, fw, fh, clip);
+    } else if hovered {
+        hover_fill(t, fx, fy, fw, fh, clip);
+    }
+    let mut badge_space = 0u32;
+    if let Some(b) = badge {
+        let bw = text_width(b).saturating_add(PAD);
+        badge_space = bw.saturating_add(PAD / 2);
+        let bx = x.saturating_add(w).saturating_sub(badge_space);
+        let by = y.saturating_add(h.saturating_sub(FONT_H + 2) / 2);
+        let bg_pill = if selected { HIGHLIGHT } else { HOVER };
+        fill_stroke_round(t, bx, by, bw, FONT_H + 2, RADIUS_SM, bg_pill, BORDER, clip);
+        let bcolor = if selected { TEXT } else { DIM };
+        text(t, bx.saturating_add(PAD / 2), by.saturating_add(1), b, bcolor, x.saturating_add(w), clip);
+    }
+    let mut tx = x.saturating_add(PAD / 2);
+    let iy = y + (h.saturating_sub(ICON)) / 2;
+    if let Some(ic) = icon_which {
+        icon(t, ic, tx, iy, TEXT, clip);
+        tx = tx.saturating_add(ICON + PAD / 2);
+    }
+    let ty = y.saturating_add(h.saturating_sub(FONT_H) / 2);
+    let xmax = x.saturating_add(w).saturating_sub(badge_space);
+    text_elide(t, tx, ty, label, TEXT, xmax, clip);
 }
 
 pub fn list_row_fg(
@@ -503,7 +591,9 @@ pub fn crumb_width(label: &str) -> u32 {
 pub fn crumb(t: Target, x: u32, y: u32, h: u32, label: &str, hovered: bool, clip: Clip) -> u32 {
     let w = crumb_width(label);
     if hovered {
-        hover_fill(t, x, y, w, h, clip);
+        fill_stroke_round(t, x, y, w, h, RADIUS_SM, HOVER, BORDER_LIGHT, clip);
+    } else {
+        fill_stroke_round(t, x, y, w, h, RADIUS_SM, SURFACE_RAISED, BORDER, clip);
     }
     let ty = y.saturating_add(h.saturating_sub(FONT_H) / 2);
     let tx = x.saturating_add(PAD / 2);
@@ -546,7 +636,11 @@ pub fn text_bold(t: Target, x: u32, y: u32, s: &str, color: u32, xmax: u32, clip
 
 fn text_cov(t: Target, x: u32, y: u32, s: &str, color: u32, xmax: u32, clip: Clip, _bold: bool) {
     let mut cx = x;
-    for c in s.bytes() {
+    for ch in s.chars() {
+        let c = {
+            let u = ch as u32;
+            if u > 255 { b'?' } else { u as u8 }
+        };
         if cx >= xmax {
             break;
         }
@@ -587,7 +681,17 @@ pub fn tooltip_size(s: &str, with_close: bool) -> (u32, u32) {
 
 pub fn tooltip(t: Target, x: u32, y: u32, s: &str, with_close: bool, clip: Clip) -> Clip {
     let (w, h) = tooltip_size(s, with_close);
-    fill_round(t, x, y, w, h, RADIUS_SM, SURFACE, clip);
+    fill_stroke_round(
+        t,
+        x,
+        y,
+        w,
+        h,
+        RADIUS_SM,
+        SURFACE_RAISED,
+        BORDER_LIGHT,
+        clip,
+    );
     text(
         t,
         x.saturating_add(PAD / 2 + 2),
@@ -651,6 +755,7 @@ pub fn icon(t: Target, which: Icon, x: u32, y: u32, color: u32, clip: Clip) {
         Icon::Up => icon_up(t, x, y, color, clip),
         Icon::Min => icon_min(t, x, y, color, clip),
         Icon::Max => icon_max(t, x, y, color, clip, false),
+        Icon::Network => icon_network(t, x, y, color, clip),
     }
 }
 
@@ -722,7 +827,13 @@ fn icon_close(t: Target, x: u32, y: u32, c: u32, clip: Clip) {
 }
 
 fn icon_min(t: Target, x: u32, y: u32, c: u32, clip: Clip) {
-    line_aa(t, x + 3, y + 11, x + 12, y + 11, c, clip);
+    fill_round(t, x + 3, y + 10, 10, 2, 1, c, clip);
+}
+
+fn icon_network(t: Target, x: u32, y: u32, c: u32, clip: Clip) {
+    fill_round(t, x + 3, y + 9, 2, 4, 1, c, clip);
+    fill_round(t, x + 7, y + 6, 2, 7, 1, c, clip);
+    fill_round(t, x + 11, y + 3, 2, 10, 1, c, clip);
 }
 
 fn icon_max(t: Target, x: u32, y: u32, c: u32, clip: Clip, restore: bool) {
@@ -734,19 +845,72 @@ fn icon_max(t: Target, x: u32, y: u32, c: u32, clip: Clip, restore: bool) {
     stroke_round(t, x + 3, y + 3, 10, 10, 1, c, clip);
 }
 
-fn stroke_round(t: Target, x: u32, y: u32, w: u32, h: u32, radius: u32, c: u32, clip: Clip) {
-    for row in 0..h {
-        for col in 0..w {
-            let cov = coverage_round(x + col, y + row, x, y, w, h, radius);
-            let inner = if w > 2 && h > 2 {
-                coverage_round(x + col, y + row, x + 1, y + 1, w - 2, h - 2, radius)
-            } else {
-                0
-            };
-            let a = cov.saturating_sub(inner);
-            plot(t, x + col, y + row, c, a, clip);
+pub fn stroke_round(
+    t: Target,
+    x: u32,
+    y: u32,
+    w: u32,
+    h: u32,
+    radius: u32,
+    color: u32,
+    clip: Clip,
+) {
+    let x1 = x.saturating_add(w).min(clip.x1).min(t.w);
+    let y1 = y.saturating_add(h).min(clip.y1).min(t.h);
+    let x0 = x.max(clip.x0);
+    let y0 = y.max(clip.y0);
+    if x0 >= x1 || y0 >= y1 || w < 2 || h < 2 {
+        return;
+    }
+    let r = radius.min(w / 2).min(h / 2);
+
+    for py in y0..y1 {
+        let ly = py.saturating_sub(y);
+        if ly >= r && ly + r < h {
+            if x >= x0 && x < x1 {
+                put(t, x, py, blend(get(t, x, py), color, 255));
+            }
+            let rx = x.saturating_add(w).saturating_sub(1);
+            if rx >= x0 && rx < x1 && rx != x {
+                put(t, rx, py, blend(get(t, rx, py), color, 255));
+            }
+            continue;
+        }
+
+        let mid_l = x.saturating_add(r).max(x0);
+        let mid_r = x.saturating_add(w.saturating_sub(r)).min(x1);
+        if (ly == 0 || ly == h.saturating_sub(1)) && mid_l < mid_r {
+            fill_span(t, mid_l, py, mid_r.saturating_sub(mid_l), color);
+        }
+
+        for px in x0..mid_l.min(x1) {
+            let cov = stroke_coverage_round(px, py, x, y, w, h, r);
+            if cov > 0 {
+                put(t, px, py, blend(get(t, px, py), color, cov));
+            }
+        }
+        for px in mid_r.max(x0)..x1 {
+            let cov = stroke_coverage_round(px, py, x, y, w, h, r);
+            if cov > 0 {
+                put(t, px, py, blend(get(t, px, py), color, cov));
+            }
         }
     }
+}
+
+pub fn fill_stroke_round(
+    t: Target,
+    x: u32,
+    y: u32,
+    w: u32,
+    h: u32,
+    radius: u32,
+    fill: u32,
+    stroke: u32,
+    clip: Clip,
+) {
+    fill_round(t, x, y, w, h, radius, fill, clip);
+    stroke_round(t, x, y, w, h, radius, stroke, clip);
 }
 
 fn icon_chev(t: Target, x: u32, y: u32, c: u32, clip: Clip, left: bool) {

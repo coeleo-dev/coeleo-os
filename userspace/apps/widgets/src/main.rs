@@ -27,11 +27,12 @@ pub extern "C" fn _start() -> ! {
             ui.feed(&raw[..n]);
         }
         ui.begin(unsafe { &mut PIX }, W, H);
-        ui.search_field(8, 28, 160, &mut field);
-        if ui.button(8, 48, 96, 32, "ok") {
+        ui.search_field(8, 28, 176, &mut field);
+        if ui.button_primary(8, 48, 96, 32, "ok") {
             ok = true;
             let _ = libcoeleo::write(1, b"ui: clicked\n");
         }
+        let _ = ui.button_secondary(110, 48, 74, 32, "cancel");
         if ui.hovering(8, 48, 96, 32) {
             ui.tooltip(110, 52, "ok");
         }

@@ -51,9 +51,13 @@ pub(super) fn minimize_frame(st: &mut State, i: usize) {
 }
 
 pub(super) fn restore_min(st: &mut State, i: usize) {
+    let old_top = visible_top(st);
     st.frames[i].minimized = false;
     raise(st, i);
     focus_frame(st, i);
+    if let Some(ot) = old_top {
+        present_damage(st, shadow_rect(&st.frames[ot]), false);
+    }
     present_damage(st, shadow_rect(&st.frames[st.frames.len() - 1]), false);
     sync_panel_mode(st);
     paint_strut(st);
@@ -77,11 +81,11 @@ pub(super) fn ensure_frame(st: &mut State, kind: FrameKind) -> Option<usize> {
             (48, 48, fm_w, fm_h)
         }
         FrameKind::Settings => {
-            let w = 360u32.min(st.fb.w.saturating_sub(64)).max(200);
-            let h = 280u32
+            let w = 520u32.min(st.fb.w.saturating_sub(64)).max(360);
+            let h = 400u32
                 .min(work.saturating_sub(40 + DECO_H + 8 + SHADOW_PX))
-                .max(120);
-            (80, 40, w, h)
+                .max(280);
+            (60, 36, w, h)
         }
         FrameKind::Client(_) => return None,
     };
@@ -121,6 +125,7 @@ pub(super) fn retarget_focus(st: &mut State) {
     };
     focus_frame(st, i);
     sync_client_top(st);
+    present_damage(st, shadow_rect(&st.frames[i]), false);
 }
 
 pub(super) fn sync_client_top(st: &State) {

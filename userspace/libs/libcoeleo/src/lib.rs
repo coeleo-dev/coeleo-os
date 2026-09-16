@@ -26,6 +26,7 @@ pub const SYS_DISKS: u64 = 23;
 pub const SYS_INSTALL: u64 = 24;
 pub const SYS_PIPE: u64 = 25;
 pub const SYS_MKDIR: u64 = 26;
+pub const SYS_CLIPBOARD: u64 = 27;
 
 pub const OPEN_READ: u64 = 1;
 pub const OPEN_WRITE: u64 = 2;
@@ -216,6 +217,33 @@ pub fn exit(code: u64) -> ! {
             in("rax") SYS_EXIT,
             in("rdi") code,
             options(noreturn),
+        );
+    }
+}
+
+pub fn clipboard_get(buf: &mut [u8]) -> Option<usize> {
+    let r = unsafe {
+        syscall3(
+            SYS_CLIPBOARD,
+            0,
+            buf.as_mut_ptr() as u64,
+            buf.len() as u64,
+        )
+    };
+    if r == ERR {
+        None
+    } else {
+        Some(r as usize)
+    }
+}
+
+pub fn clipboard_set(data: &[u8]) {
+    unsafe {
+        syscall3(
+            SYS_CLIPBOARD,
+            1,
+            data.as_ptr() as u64,
+            data.len() as u64,
         );
     }
 }

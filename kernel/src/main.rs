@@ -21,7 +21,8 @@ mod net;
 mod task;
 mod ui;
 
-pub(crate) use boot::{acpi, console, gdt, init, interrupts, lapic, rtc, serial, shell};
+#[allow(unused_imports)]
+pub(crate) use boot::{acpi, console, gdt, init, interrupts, kdebug, lapic, rtc, serial, shell};
 pub(crate) use bus::{pci, xhci};
 pub(crate) use fs::{ahci, blk, fat_disk, gpt, install, part, usb_msc};
 pub(crate) use input::{kbd, mouse, ps2, uhci, usb_hid};
@@ -134,9 +135,13 @@ unsafe extern "C" fn kmain() -> ! {
         while let Some(b) = kbd::pop_byte() {
             shell::handle_byte(b);
         }
+        serial::write_str("kmain: comp::poll\n");
         comp::poll();
+        serial::write_str("kmain: net::poll\n");
         net::poll();
+        serial::write_str("kmain: clock::paint\n");
         clock::paint_if_second_elapsed();
+        // serial::write_str("kmain: wait\n"); // too noisy
         interrupts::wait();
     }
 }

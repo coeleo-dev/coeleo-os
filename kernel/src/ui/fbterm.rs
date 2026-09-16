@@ -85,27 +85,27 @@ static MASKS: Mutex<Option<Masks>> = Mutex::new(None);
 static VT: Mutex<Option<Vt>> = Mutex::new(None);
 
 static ANSI: [u32; 8] = [
-    0x001B_1B1B,
-    0x00ED_1515,
-    0x0011_D116,
-    0x00F6_7400,
-    0x001D_99F3,
-    0x009B_59B6,
-    0x001A_BC9C,
-    0x00E0_E0E0,
+    0x001C_212B, // 0: Black (Surface)
+    0x00F8_5149, // 1: Red (Danger)
+    0x003F_B950, // 2: Green (Success)
+    0x00D2_9922, // 3: Yellow (Warning)
+    0x0038_8BFD, // 4: Blue (Accent)
+    0x00BC_8CFF, // 5: Magenta
+    0x0039_C5CF, // 6: Cyan
+    0x00F0_F4F8, // 7: White (Text)
 ];
 static ANSI_BRIGHT: [u32; 8] = [
-    0x007F_8C8D,
-    0x00C0_392B,
-    0x001C_DC9A,
-    0x00FD_BC4B,
-    0x003D_AEE9,
-    0x008E_44AD,
-    0x003D_AEE9,
-    0x00FF_FFFF,
+    0x006E_7681, // 0: Bright Black (Muted)
+    0x00FF_7B72, // 1: Bright Red
+    0x0056_D364, // 2: Bright Green
+    0x00E3_B341, // 3: Bright Yellow
+    0x0058_A6FF, // 4: Bright Blue
+    0x00D2_A8FF, // 5: Bright Magenta
+    0x0056_D4DD, // 6: Bright Cyan
+    0x00FF_FFFF, // 7: Bright White
 ];
-static DEFAULT_BG: u32 = 0x001B_1B1B;
-static DEFAULT_FG: u32 = 0x00E0_E0E0;
+static DEFAULT_BG: u32 = 0x001C_212B;
+static DEFAULT_FG: u32 = 0x00F0_F4F8;
 
 /// Record the Limine framebuffer. Does not init Flanterm (heap is not up yet).
 pub fn init(fb: &Framebuffer<'_>) -> bool {

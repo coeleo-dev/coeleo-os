@@ -6,13 +6,13 @@ use alloc::vec::Vec;
 
 use crate::fbterm::FbInfo;
 use coeleo_draw::{self, Clip, Icon, Target};
-use coeleo_theme::{DIM, RADIUS, SHADOW_A, SHADOW_PX, SURFACE, TEXT};
+use coeleo_theme::{BORDER, BORDER_LIGHT, DIM, RADIUS, SHADOW_A, SHADOW_PX, SURFACE_RAISED};
 
 pub const RUNNER_W: u32 = 480;
 pub const QUERY_H: u32 = coeleo_draw::FONT_H + coeleo_theme::GAP;
 pub const ROW: u32 = QUERY_H;
 pub const PAD: u32 = coeleo_theme::PAD;
-pub const HINT: &str = "Esc to close";
+pub const HINT: &str = "Esc to close  •  Enter to launch";
 pub const HINT_H: u32 = coeleo_draw::FONT_H + coeleo_theme::PAD;
 
 const SHADOW_OFF: u32 = coeleo_theme::SHADOW_OFF;
@@ -141,7 +141,17 @@ pub fn paint(
     };
     let pw = popup.x1.saturating_sub(popup.x0);
     let ph = popup.y1.saturating_sub(popup.y0);
-    coeleo_draw::fill_round(t, popup.x0, popup.y0, pw, ph, RADIUS, SURFACE, dclip);
+    coeleo_draw::fill_stroke_round(
+        t,
+        popup.x0,
+        popup.y0,
+        pw,
+        ph,
+        RADIUS,
+        SURFACE_RAISED,
+        BORDER_LIGHT,
+        dclip,
+    );
     let qy = popup.y0.saturating_add(PAD);
     let qw = pw.saturating_sub(PAD * 2);
     let qs = core::str::from_utf8(query).unwrap_or("");
@@ -172,18 +182,19 @@ pub fn paint(
     } else {
         for (i, name) in rows.iter().enumerate() {
             let y = ry0.saturating_add(i as u32 * ROW);
-            let ic = match name.as_str() {
-                "files" => Icon::Folder,
-                "sh" => Icon::Terminal,
-                _ => Icon::App,
+            let (ic, badge) = match name.as_str() {
+                "files" => (Icon::Folder, "App"),
+                "sh" => (Icon::Terminal, "Cmd"),
+                _ => (Icon::App, "App"),
             };
-            coeleo_draw::list_row(
+            coeleo_draw::list_row_badge(
                 t,
                 popup.x0.saturating_add(PAD),
                 y,
                 pw.saturating_sub(PAD * 2),
                 ROW,
                 label(name),
+                Some(badge),
                 Some(ic),
                 i == sel,
                 hover == Hit::Row(i) && i != sel,
@@ -192,12 +203,19 @@ pub fn paint(
         }
     }
     let hy = popup.y1.saturating_sub(HINT_H);
+    coeleo_draw::fill_span(
+        t,
+        popup.x0.saturating_add(PAD),
+        hy,
+        pw.saturating_sub(PAD * 2),
+        BORDER,
+    );
     coeleo_draw::text(
         t,
         popup.x0.saturating_add(PAD),
-        hy.saturating_add(PAD / 2),
+        hy.saturating_add(PAD / 2 + 1),
         HINT,
-        TEXT,
+        DIM,
         popup.x1,
         dclip,
     );

@@ -34,6 +34,7 @@ pub const SYS_DISKS: u64 = 23;
 pub const SYS_INSTALL: u64 = 24;
 pub const SYS_PIPE: u64 = 25;
 pub const SYS_MKDIR: u64 = 26;
+pub const SYS_CLIPBOARD: u64 = 27;
 
 #[repr(C)]
 pub struct CpuLocal {
@@ -120,6 +121,7 @@ extern "C" fn syscall_dispatch(num: u64, a0: u64, a1: u64, a2: u64) -> u64 {
         SYS_INSTALL => crate::install::sys_install(a0),
         SYS_PIPE => crate::fd::sys_pipe(a0),
         SYS_MKDIR => crate::fd::sys_mkdir(a0, a1),
+        SYS_CLIPBOARD => crate::comp::clip::sys_clipboard(a0, a1, a2),
         _ => u64::MAX,
     }
 }
