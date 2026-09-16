@@ -1,7 +1,7 @@
 //! Local APIC: xAPIC MMIO, PIT channel 2 used once to calibrate, then 100 Hz periodic.
 
 use core::ptr;
-use core::sync::atomic::{AtomicPtr, Ordering};
+use core::sync::atomic::{AtomicPtr, AtomicU32, Ordering};
 
 use x86_64::instructions::port::Port;
 use x86_64::registers::model_specific::{ApicBase, ApicBaseFlags};
@@ -30,8 +30,36 @@ const PIT_HZ: u32 = 1_193_182;
 const CALIBRATE_MS: u32 = 10;
 
 static MMIO: AtomicPtr<u8> = AtomicPtr::new(ptr::null_mut());
+static TICKS_PER_10MS: AtomicU32 = AtomicU32::new(0);
 
-pub fn init() {
+pub fn init_bsp() {
+    map_common();
+    write_reg(SVR, SVR_SW_ENABLE | u32::from(SPURIOUS_VECTOR));
+    write_reg(LVT_ERROR, LVT_MASKED | u32::from(SPURIOUS_VECTOR));
+    // Virtual wire: PIC IRQs still reach the CPU through LINT0.
+    write_reg(LVT_LINT0, LINT_EXTINT);
+    write_reg(DIVIDE, DIVIDE_BY_16);
+
+    let initial = pit_ticks_per_10ms();
+    TICKS_PER_10MS.store(initial, Ordering::Release);
+    write_reg(LVT_TIMER, u32::from(TIMER_VECTOR) | LVT_PERIODIC);
+    write_reg(INIT, initial);
+}
+
+/// AP bring-up: reuse the BSP's PIT calibration; no PIT access here.
+pub fn init_ap() {
+    write_reg(SVR, SVR_SW_ENABLE | u32::from(SPURIOUS_VECTOR));
+    write_reg(LVT_ERROR, LVT_MASKED | u32::from(SPURIOUS_VECTOR));
+    // APs have no 8259 PIC wired to LINT0.
+    write_reg(LVT_LINT0, LVT_MASKED);
+    write_reg(DIVIDE, DIVIDE_BY_16);
+
+    let initial = TICKS_PER_10MS.load(Ordering::Acquire);
+    write_reg(LVT_TIMER, u32::from(TIMER_VECTOR) | LVT_PERIODIC);
+    write_reg(INIT, initial);
+}
+
+fn map_common() {
     let (frame, mut flags) = ApicBase::read();
     flags.remove(ApicBaseFlags::X2APIC_ENABLE);
     flags.insert(ApicBaseFlags::LAPIC_ENABLE);
@@ -42,16 +70,6 @@ pub fn init() {
 
     let virt = vmm::map_mmio(frame.start_address());
     MMIO.store(virt.as_mut_ptr(), Ordering::Release);
-
-    write_reg(SVR, SVR_SW_ENABLE | u32::from(SPURIOUS_VECTOR));
-    write_reg(LVT_ERROR, LVT_MASKED | u32::from(SPURIOUS_VECTOR));
-    // Virtual wire: PIC IRQs still reach the CPU through LINT0.
-    write_reg(LVT_LINT0, LINT_EXTINT);
-    write_reg(DIVIDE, DIVIDE_BY_16);
-
-    let initial = pit_ticks_per_10ms();
-    write_reg(LVT_TIMER, u32::from(TIMER_VECTOR) | LVT_PERIODIC);
-    write_reg(INIT, initial);
 }
 
 pub fn eoi() {

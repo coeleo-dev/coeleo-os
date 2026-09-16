@@ -27,6 +27,7 @@ pub const SYS_INSTALL: u64 = 24;
 pub const SYS_PIPE: u64 = 25;
 pub const SYS_MKDIR: u64 = 26;
 pub const SYS_CLIPBOARD: u64 = 27;
+pub const SYS_THREAD_CREATE: u64 = 28;
 
 pub const OPEN_READ: u64 = 1;
 pub const OPEN_WRITE: u64 = 2;
@@ -72,6 +73,14 @@ struct PingArgs {
     name_len: u64,
     buf_ptr: u64,
     buf_len: u64,
+}
+
+#[repr(C)]
+struct ThreadArgs {
+    entry: u64,
+    arg: u64,
+    stack: u64,
+    tls: u64,
 }
 
 pub fn write(fd: u64, buf: &[u8]) -> u64 {
@@ -184,6 +193,18 @@ pub fn http_get(url: &str, buf: &mut [u8]) -> u64 {
         buf_len: buf.len() as u64,
     };
     syscall1(SYS_HTTP_GET, &args as *const HttpGetArgs as u64)
+}
+
+/// Create a thread in this process: `entry(arg)` on a fresh user stack (`stack`
+/// is the top), with `tls` as its `FsBase`. Returns the tid or `ERR`.
+pub fn thread_create(entry: u64, arg: u64, stack: u64, tls: u64) -> u64 {
+    let args = ThreadArgs {
+        entry,
+        arg,
+        stack,
+        tls,
+    };
+    syscall1(SYS_THREAD_CREATE, &args as *const ThreadArgs as u64)
 }
 
 pub fn win_create(w: u32, h: u32, pixels: &[u32]) -> u64 {

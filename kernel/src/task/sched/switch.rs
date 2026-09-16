@@ -1,88 +1,43 @@
 //! Context switch, FPU, and LAPIC timer. All naked asm lives here.
 
 use core::arch::naked_asm;
-use core::sync::atomic::{AtomicU8, AtomicUsize, Ordering};
 
 use x86_64::VirtAddr;
 use x86_64::registers::control::{Cr0, Cr0Flags, Cr4, Cr4Flags};
-use x86_64::registers::model_specific::{GsBase, KernelGsBase};
+use x86_64::registers::model_specific::{FsBase, GsBase, KernelGsBase};
 
 use crate::elfload;
+use crate::percpu::{self, PerCpu, MAX_CPU};
 use crate::process::Outcome;
-use crate::syscall::CPU_LOCAL;
 
 use super::pcb::{
     FxBuf, IrqFrame, KSTACK_SIZE, KernelCont, KernelStack, MAX_PROC, Pcb, SCHED, Sched, State,
     TrapFrame,
 };
 
-pub(super) static mut KSTACKS: [KernelStack; MAX_PROC] = [KernelStack([0; KSTACK_SIZE]); MAX_PROC];
-pub(super) static mut KCONTS: [KernelCont; MAX_PROC] = [KernelCont {
-    rbx: 0,
-    rbp: 0,
-    r12: 0,
-    r13: 0,
-    r14: 0,
-    r15: 0,
-    rsp: 0,
-    rflags: 0,
-    rip: 0,
-}; MAX_PROC];
-pub(super) static mut HOST_KCONT: KernelCont = KernelCont {
-    rbx: 0,
-    rbp: 0,
-    r12: 0,
-    r13: 0,
-    r14: 0,
-    r15: 0,
-    rsp: 0,
-    rflags: 0,
-    rip: 0,
-};
-pub(super) static mut FXSAVES: [FxBuf; MAX_PROC] = [FxBuf([0; 512]); MAX_PROC];
+pub(super) static mut KSTACKS: [[KernelStack; MAX_PROC]; MAX_CPU] =
+    [[KernelStack([0; KSTACK_SIZE]); MAX_PROC]; MAX_CPU];
+pub(super) static mut KCONTS: [[KernelCont; MAX_PROC]; MAX_CPU] =
+    [[KernelCont::zero(); MAX_PROC]; MAX_CPU];
+pub(super) static mut FXSAVES: [[FxBuf; MAX_PROC]; MAX_CPU] =
+    [[FxBuf::zero(); MAX_PROC]; MAX_CPU];
 pub(super) static mut FX_TEMPLATE: FxBuf = FxBuf([0; 512]);
-pub(super) static mut IRET_TRAP: TrapFrame = TrapFrame {
-    rax: 0,
-    rbx: 0,
-    rcx: 0,
-    rdx: 0,
-    rsi: 0,
-    rdi: 0,
-    rbp: 0,
-    r8: 0,
-    r9: 0,
-    r10: 0,
-    r11: 0,
-    r12: 0,
-    r13: 0,
-    r14: 0,
-    r15: 0,
-    rip: 0,
-    cs: 0,
-    rflags: 0,
-    rsp: 0,
-    ss: 0,
-};
-pub(super) static mut IRET_FX: FxBuf = FxBuf([0; 512]);
-
-pub(super) static CURRENT_SLOT: AtomicUsize = AtomicUsize::new(0);
-pub(super) static KCONT_PTR: AtomicUsize = AtomicUsize::new(0);
-pub(super) static FXSAVE_PTR: AtomicUsize = AtomicUsize::new(0);
-pub(super) static OUTCOME: AtomicU8 = AtomicU8::new(0);
 
 pub(super) fn kstack_top(slot: usize) -> VirtAddr {
-    let end = unsafe { (&raw const KSTACKS[slot].0).cast::<u8>().add(KSTACK_SIZE) };
+    let cpu = percpu::cpu_id();
+    let end = unsafe { (&raw const KSTACKS[cpu][slot].0).cast::<u8>().add(KSTACK_SIZE) };
     VirtAddr::from_ptr(end)
 }
 
 pub(super) fn set_current_slot(slot: usize) {
-    CURRENT_SLOT.store(slot, Ordering::SeqCst);
-    let kptr = unsafe { &raw mut KCONTS[slot] as *mut KernelCont as usize };
-    KCONT_PTR.store(kptr, Ordering::SeqCst);
-    let fptr = unsafe { core::ptr::addr_of_mut!(FXSAVES[slot].0) as usize };
-    FXSAVE_PTR.store(fptr, Ordering::SeqCst);
+    let cpu = percpu::cpu_id();
+    let pc = percpu::this_cpu();
+    pc.current_slot = slot;
+    pc.kcont_ptr = unsafe { &raw mut KCONTS[cpu][slot] as *mut KernelCont as usize };
+    pc.fxsave_ptr = unsafe { core::ptr::addr_of_mut!(FXSAVES[cpu][slot].0) as usize };
 }
 
+/// Per-CPU FPU enable (CR0/CR4) and reset. Runs on the BSP and every AP.
 pub fn init() {
     unsafe {
         Cr0::update(|f| {
@@ -92,38 +47,39 @@ pub fn init() {
         Cr4::update(|f| {
             f.insert(Cr4Flags::OSFXSR | Cr4Flags::OSXMMEXCPT_ENABLE);
         });
+        core::arch::asm!("fninit", options(nostack));
+    }
+}
+
+/// Capture the pristine FPU state into `FX_TEMPLATE`. BSP only, right after
+/// [`init`], before any FPU use: the template is copied to every new thread.
+pub fn init_template() {
+    unsafe {
         core::arch::asm!(
-            "fninit",
             "fxsave64 [{}]",
             in(reg) core::ptr::addr_of_mut!(FX_TEMPLATE.0),
             options(nostack),
         );
     }
 }
-pub(super) fn gs_enter_user() {
-    unsafe {
-        GsBase::write(x86_64::VirtAddr::zero());
-        KernelGsBase::write(x86_64::VirtAddr::from_ptr(&raw const CPU_LOCAL));
-    }
-}
 
 pub(super) fn gs_enter_kernel_syscall() {
     unsafe {
-        GsBase::write(x86_64::VirtAddr::from_ptr(&raw const CPU_LOCAL));
-        KernelGsBase::write(x86_64::VirtAddr::zero());
+        GsBase::write(VirtAddr::from_ptr(percpu::this_cpu() as *const PerCpu));
+        KernelGsBase::write(VirtAddr::zero());
     }
 }
 
 pub(super) fn apply_hw(slot: usize) {
     let (l4, top, user_rsp) = {
         let s = SCHED.lock();
-        let p = s.procs[slot].as_ref().unwrap();
-        (p.l4, kstack_top(slot), p.user_rsp)
+        let t = s.threads[slot].as_ref().unwrap();
+        let p = s.procs[t.proc].as_ref().unwrap();
+        (p.l4, kstack_top(slot), t.user_rsp)
     };
-    unsafe {
-        CPU_LOCAL.kernel_rsp = top.as_u64();
-        CPU_LOCAL.user_rsp = user_rsp;
-    }
+    let pc = percpu::this_cpu();
+    pc.kernel_rsp = top.as_u64();
+    pc.user_rsp = user_rsp;
     crate::gdt::set_user_kernel_stack(top);
     crate::vmm::load_cr3(l4);
 }
@@ -131,7 +87,8 @@ pub(super) fn apply_hw(slot: usize) {
 pub(super) unsafe fn enter_scheduler() {
     unsafe {
         if save_host() == 0 {
-            let slot = SCHED.lock().current.unwrap();
+            let cpu = percpu::cpu_id();
+            let slot = SCHED.lock().current[cpu].unwrap();
             resume_user_slot(slot);
         }
     }
@@ -140,26 +97,26 @@ pub(super) unsafe fn enter_scheduler() {
 pub(super) fn leave_scheduler(outcome: Outcome) -> ! {
     unload_all();
     {
+        let cpu = percpu::cpu_id();
         let mut s = SCHED.lock();
-        s.current = None;
+        s.current[cpu] = None;
         s.exclusive = false;
         s.init_pid = 0;
     }
     crate::vmm::restore_kernel_cr3();
+    let cpu = percpu::cpu_id();
+    let pc = percpu::this_cpu();
+    pc.kernel_rsp = crate::gdt::user_kernel_stack_top(cpu).as_u64();
+    crate::gdt::set_user_kernel_stack(crate::gdt::user_kernel_stack_top(cpu));
     unsafe {
-        CPU_LOCAL.kernel_rsp = crate::gdt::user_kernel_stack_top().as_u64();
-        crate::gdt::set_user_kernel_stack(crate::gdt::user_kernel_stack_top());
-        x86_64::registers::model_specific::GsBase::write(x86_64::VirtAddr::zero());
-        x86_64::registers::model_specific::KernelGsBase::write(x86_64::VirtAddr::from_ptr(
-            &raw const CPU_LOCAL,
-        ));
-        OUTCOME.store(
-            match outcome {
-                Outcome::Exited => 0,
-                Outcome::Fault => 1,
-            },
-            Ordering::SeqCst,
-        );
+        GsBase::write(VirtAddr::from_ptr(pc as *const PerCpu));
+        KernelGsBase::write(VirtAddr::zero());
+    }
+    pc.outcome = match outcome {
+        Outcome::Exited => 0,
+        Outcome::Fault => 1,
+    };
+    unsafe {
         restore_host();
     }
 }
@@ -167,6 +124,7 @@ pub(super) fn leave_scheduler(outcome: Outcome) -> ! {
 pub(super) fn unload_all() {
     let mut s = SCHED.lock();
     for slot in 0..MAX_PROC {
+        s.threads[slot] = None;
         if let Some(mut pcb) = s.procs[slot].take() {
             pcb.fds.close_all();
             if let Some(image) = pcb.image.take() {
@@ -186,11 +144,12 @@ pub(super) fn drop_pcb(mut pcb: Pcb) {
 }
 
 pub(super) fn fxsave_current() {
-    let slot = CURRENT_SLOT.load(Ordering::SeqCst);
+    let cpu = percpu::cpu_id();
+    let slot = percpu::this_cpu().current_slot;
     unsafe {
         core::arch::asm!(
             "fxsave64 [{}]",
-            in(reg) core::ptr::addr_of_mut!(FXSAVES[slot].0),
+            in(reg) core::ptr::addr_of_mut!(FXSAVES[cpu][slot].0),
             options(nostack, preserves_flags),
         );
     }
@@ -201,23 +160,24 @@ pub(super) fn yield_block(state: State) {
         if save_kcont() == 0 {
             fxsave_current();
             {
+                let cpu = percpu::cpu_id();
                 let mut s = SCHED.lock();
-                let i = s.current.expect("yield");
-                s.procs[i].as_mut().unwrap().state = state;
-                s.procs[i].as_mut().unwrap().kcont_valid = true;
+                let i = s.current[cpu].expect("yield");
+                s.threads[i].as_mut().unwrap().state = state;
+                s.threads[i].as_mut().unwrap().kcont_valid = true;
             }
             schedule_next();
         } else {
-            let slot = CURRENT_SLOT.load(Ordering::SeqCst);
+            let slot = percpu::this_cpu().current_slot;
             {
                 let mut s = SCHED.lock();
-                if let Some(p) = s.procs[slot].as_mut() {
-                    p.kcont_valid = false;
+                if let Some(t) = s.threads[slot].as_mut() {
+                    t.kcont_valid = false;
                 }
             }
             core::arch::asm!(
                 "fxrstor64 [{}]",
-                in(reg) core::ptr::addr_of!(FXSAVES[slot].0),
+                in(reg) core::ptr::addr_of!(FXSAVES[percpu::cpu_id()][slot].0),
                 options(nostack, preserves_flags),
             );
         }
@@ -225,29 +185,34 @@ pub(super) fn yield_block(state: State) {
 }
 
 pub fn schedule_next() -> ! {
+    let cpu = percpu::cpu_id();
     loop {
         let pick = {
             let s = SCHED.lock();
-            pick_runnable(&s)
+            pick_runnable(&s, cpu)
         };
         if let Some(slot) = pick {
             switch_to(slot);
         }
-        crate::comp::poll();
-        crate::clock::paint_if_second_elapsed();
+        // The compositor and the clock overlay are painted only on the BSP;
+        // an AP idling in the scheduler must not race the framebuffer.
+        if cpu == 0 {
+            crate::comp::poll();
+            crate::clock::paint_if_second_elapsed();
+        }
         x86_64::instructions::interrupts::enable_and_hlt();
         x86_64::instructions::interrupts::disable();
     }
 }
 
-pub(super) fn pick_runnable(s: &Sched) -> Option<usize> {
-    let start = s.current.map(|c| c + 1).unwrap_or(0);
+pub(super) fn pick_runnable(s: &Sched, cpu: usize) -> Option<usize> {
+    let start = s.current[cpu].map(|c| c + 1).unwrap_or(0);
     for k in 0..MAX_PROC {
         let i = (start + k) % MAX_PROC;
-        let Some(p) = s.procs[i].as_ref() else {
+        let Some(t) = s.threads[i].as_ref() else {
             continue;
         };
-        if p.state == State::Runnable || p.state == State::Running {
+        if t.state == State::Runnable || t.state == State::Running {
             return Some(i);
         }
     }
@@ -255,21 +220,22 @@ pub(super) fn pick_runnable(s: &Sched) -> Option<usize> {
 }
 
 pub(super) fn switch_to(slot: usize) -> ! {
+    let cpu = percpu::cpu_id();
     let kcont = {
         let mut s = SCHED.lock();
-        if let Some(c) = s.current {
+        if let Some(c) = s.current[cpu] {
             if c != slot {
-                if let Some(p) = s.procs[c].as_mut() {
-                    if p.state == State::Running {
-                        p.state = State::Runnable;
+                if let Some(t) = s.threads[c].as_mut() {
+                    if t.state == State::Running {
+                        t.state = State::Runnable;
                     }
-                    p.user_rsp = unsafe { CPU_LOCAL.user_rsp };
+                    t.user_rsp = percpu::this_cpu().user_rsp;
                 }
             }
         }
-        s.current = Some(slot);
-        s.procs[slot].as_mut().unwrap().state = State::Running;
-        s.procs[slot].as_ref().unwrap().kcont_valid
+        s.current[cpu] = Some(slot);
+        s.threads[slot].as_mut().unwrap().state = State::Running;
+        s.threads[slot].as_ref().unwrap().kcont_valid
     };
     set_current_slot(slot);
     apply_hw(slot);
@@ -284,11 +250,19 @@ pub(super) fn switch_to(slot: usize) -> ! {
 }
 
 pub(super) fn resume_user_slot(slot: usize) -> ! {
-    let trap = SCHED.lock().procs[slot].as_ref().unwrap().trap;
+    let cpu = percpu::cpu_id();
+    let (trap, tls) = {
+        let s = SCHED.lock();
+        let t = s.threads[slot].as_ref().unwrap();
+        (t.trap, t.tls)
+    };
+    let pc = percpu::this_cpu();
+    pc.iret_trap = trap;
+    pc.iret_fx = unsafe { FXSAVES[cpu][slot] };
+    // Restore this thread's TLS before dropping into Ring 3 (iretq does not
+    // reload FS).
+    FsBase::write(VirtAddr::new(tls));
     unsafe {
-        IRET_TRAP = trap;
-        IRET_FX = FXSAVES[slot];
-        gs_enter_user();
         resume_user();
     }
 }
@@ -298,14 +272,15 @@ extern "C" fn timer_from_user(frame: *const IrqFrame) {
     let frame = unsafe { &*frame };
     crate::clock::tick();
     crate::lapic::eoi();
+    let cpu = percpu::cpu_id();
     let next = {
         let mut s = SCHED.lock();
-        let Some(cur) = s.current else {
+        let Some(cur) = s.current[cpu] else {
             return;
         };
-        if s.procs[cur]
+        if s.threads[cur]
             .as_ref()
-            .is_none_or(|p| p.state == State::Zombie)
+            .is_none_or(|t| t.state == State::Zombie)
         {
             drop(s);
             schedule_next();
@@ -314,19 +289,19 @@ extern "C" fn timer_from_user(frame: *const IrqFrame) {
         let Some(n) = other else {
             return;
         };
-        if let Some(p) = s.procs[cur].as_mut() {
-            p.trap = trap_from_irq(frame);
-            p.state = State::Runnable;
-            p.kcont_valid = false;
-            p.user_rsp = unsafe { CPU_LOCAL.user_rsp };
+        if let Some(t) = s.threads[cur].as_mut() {
+            t.trap = trap_from_irq(frame);
+            t.state = State::Runnable;
+            t.kcont_valid = false;
+            t.user_rsp = percpu::this_cpu().user_rsp;
         }
-        s.current = Some(n);
-        s.procs[n].as_mut().unwrap().state = State::Running;
+        s.current[cpu] = Some(n);
+        s.threads[n].as_mut().unwrap().state = State::Running;
         n
     };
     set_current_slot(next);
     apply_hw(next);
-    let kcont = SCHED.lock().procs[next].as_ref().unwrap().kcont_valid;
+    let kcont = SCHED.lock().threads[next].as_ref().unwrap().kcont_valid;
     if kcont {
         gs_enter_kernel_syscall();
         unsafe {
@@ -340,9 +315,9 @@ extern "C" fn timer_from_user(frame: *const IrqFrame) {
 pub(super) fn pick_runnable_other(s: &Sched, cur: usize) -> Option<usize> {
     for k in 1..MAX_PROC {
         let i = (cur + k) % MAX_PROC;
-        if s.procs[i]
+        if s.threads[i]
             .as_ref()
-            .is_some_and(|p| p.state == State::Runnable)
+            .is_some_and(|t| t.state == State::Runnable)
         {
             return Some(i);
         }
@@ -376,14 +351,18 @@ pub(super) fn trap_from_irq(frame: &IrqFrame) -> TrapFrame {
 }
 
 pub extern "C" fn timer_kernel() {
-    crate::clock::tick();
+    // Only the BSP advances the system clock; every CPU still ACKs its own
+    // timer so the LAPIC can fire again.
+    if percpu::cpu_id() == 0 {
+        crate::clock::tick();
+    }
     crate::lapic::eoi();
 }
 
 #[unsafe(naked)]
 unsafe extern "C" fn save_kcont() -> u64 {
     naked_asm!(
-        "mov rax, [{ptr}]",
+        "mov rax, gs:[{kptr}]",
         "mov [rax + {off_rbx}], rbx",
         "mov [rax + {off_rbp}], rbp",
         "mov [rax + {off_r12}], r12",
@@ -399,7 +378,7 @@ unsafe extern "C" fn save_kcont() -> u64 {
         "mov [rax + {off_rflags}], rcx",
         "xor eax, eax",
         "ret",
-        ptr = sym KCONT_PTR,
+        kptr = const core::mem::offset_of!(PerCpu, kcont_ptr),
         off_rbx = const core::mem::offset_of!(KernelCont, rbx),
         off_rbp = const core::mem::offset_of!(KernelCont, rbp),
         off_r12 = const core::mem::offset_of!(KernelCont, r12),
@@ -415,7 +394,7 @@ unsafe extern "C" fn save_kcont() -> u64 {
 #[unsafe(naked)]
 unsafe extern "C" fn restore_kcont() -> ! {
     naked_asm!(
-        "mov rax, [{ptr}]",
+        "mov rax, gs:[{kptr}]",
         "mov rbx, [rax + {off_rbx}]",
         "mov rbp, [rax + {off_rbp}]",
         "mov r12, [rax + {off_r12}]",
@@ -428,7 +407,7 @@ unsafe extern "C" fn restore_kcont() -> ! {
         "mov rcx, [rax + {off_rip}]",
         "mov eax, 1",
         "jmp rcx",
-        ptr = sym KCONT_PTR,
+        kptr = const core::mem::offset_of!(PerCpu, kcont_ptr),
         off_rbx = const core::mem::offset_of!(KernelCont, rbx),
         off_rbp = const core::mem::offset_of!(KernelCont, rbp),
         off_r12 = const core::mem::offset_of!(KernelCont, r12),
@@ -444,22 +423,22 @@ unsafe extern "C" fn restore_kcont() -> ! {
 #[unsafe(naked)]
 unsafe extern "C" fn save_host() -> u64 {
     naked_asm!(
-        "mov [{k} + {off_rbx}], rbx",
-        "mov [{k} + {off_rbp}], rbp",
-        "mov [{k} + {off_r12}], r12",
-        "mov [{k} + {off_r13}], r13",
-        "mov [{k} + {off_r14}], r14",
-        "mov [{k} + {off_r15}], r15",
+        "mov gs:[{host} + {off_rbx}], rbx",
+        "mov gs:[{host} + {off_rbp}], rbp",
+        "mov gs:[{host} + {off_r12}], r12",
+        "mov gs:[{host} + {off_r13}], r13",
+        "mov gs:[{host} + {off_r14}], r14",
+        "mov gs:[{host} + {off_r15}], r15",
         "mov rcx, [rsp]",
-        "mov [{k} + {off_rip}], rcx",
+        "mov gs:[{host} + {off_rip}], rcx",
         "lea rcx, [rsp + 8]",
-        "mov [{k} + {off_rsp}], rcx",
+        "mov gs:[{host} + {off_rsp}], rcx",
         "pushfq",
         "pop rcx",
-        "mov [{k} + {off_rflags}], rcx",
+        "mov gs:[{host} + {off_rflags}], rcx",
         "xor eax, eax",
         "ret",
-        k = sym HOST_KCONT,
+        host = const core::mem::offset_of!(PerCpu, host_kcont),
         off_rbx = const core::mem::offset_of!(KernelCont, rbx),
         off_rbp = const core::mem::offset_of!(KernelCont, rbp),
         off_r12 = const core::mem::offset_of!(KernelCont, r12),
@@ -475,19 +454,19 @@ unsafe extern "C" fn save_host() -> u64 {
 #[unsafe(naked)]
 unsafe extern "C" fn restore_host() -> ! {
     naked_asm!(
-        "mov rbx, [{k} + {off_rbx}]",
-        "mov rbp, [{k} + {off_rbp}]",
-        "mov r12, [{k} + {off_r12}]",
-        "mov r13, [{k} + {off_r13}]",
-        "mov r14, [{k} + {off_r14}]",
-        "mov r15, [{k} + {off_r15}]",
-        "mov rsp, [{k} + {off_rsp}]",
-        "push qword ptr [{k} + {off_rflags}]",
+        "mov rbx, gs:[{host} + {off_rbx}]",
+        "mov rbp, gs:[{host} + {off_rbp}]",
+        "mov r12, gs:[{host} + {off_r12}]",
+        "mov r13, gs:[{host} + {off_r13}]",
+        "mov r14, gs:[{host} + {off_r14}]",
+        "mov r15, gs:[{host} + {off_r15}]",
+        "mov rsp, gs:[{host} + {off_rsp}]",
+        "push qword ptr gs:[{host} + {off_rflags}]",
         "popfq",
-        "mov rcx, [{k} + {off_rip}]",
+        "mov rcx, gs:[{host} + {off_rip}]",
         "mov eax, 1",
         "jmp rcx",
-        k = sym HOST_KCONT,
+        host = const core::mem::offset_of!(PerCpu, host_kcont),
         off_rbx = const core::mem::offset_of!(KernelCont, rbx),
         off_rbp = const core::mem::offset_of!(KernelCont, rbp),
         off_r12 = const core::mem::offset_of!(KernelCont, r12),
@@ -503,30 +482,31 @@ unsafe extern "C" fn restore_host() -> ! {
 #[unsafe(naked)]
 unsafe extern "C" fn resume_user() -> ! {
     naked_asm!(
-        "fxrstor64 [{fx}]",
-        "mov rax, [{t} + {off_rax}]",
-        "mov rbx, [{t} + {off_rbx}]",
-        "mov rcx, [{t} + {off_rcx}]",
-        "mov rdx, [{t} + {off_rdx}]",
-        "mov rsi, [{t} + {off_rsi}]",
-        "mov rdi, [{t} + {off_rdi}]",
-        "mov rbp, [{t} + {off_rbp}]",
-        "mov r8, [{t} + {off_r8}]",
-        "mov r9, [{t} + {off_r9}]",
-        "mov r10, [{t} + {off_r10}]",
-        "mov r11, [{t} + {off_r11}]",
-        "mov r12, [{t} + {off_r12}]",
-        "mov r13, [{t} + {off_r13}]",
-        "mov r14, [{t} + {off_r14}]",
-        "mov r15, [{t} + {off_r15}]",
-        "push qword ptr [{t} + {off_ss}]",
-        "push qword ptr [{t} + {off_rsp}]",
-        "push qword ptr [{t} + {off_rflags}]",
-        "push qword ptr [{t} + {off_cs}]",
-        "push qword ptr [{t} + {off_rip}]",
+        "fxrstor64 gs:[{fx}]",
+        "mov rax, gs:[{t} + {off_rax}]",
+        "mov rbx, gs:[{t} + {off_rbx}]",
+        "mov rcx, gs:[{t} + {off_rcx}]",
+        "mov rdx, gs:[{t} + {off_rdx}]",
+        "mov rsi, gs:[{t} + {off_rsi}]",
+        "mov rdi, gs:[{t} + {off_rdi}]",
+        "mov rbp, gs:[{t} + {off_rbp}]",
+        "mov r8, gs:[{t} + {off_r8}]",
+        "mov r9, gs:[{t} + {off_r9}]",
+        "mov r10, gs:[{t} + {off_r10}]",
+        "mov r11, gs:[{t} + {off_r11}]",
+        "mov r12, gs:[{t} + {off_r12}]",
+        "mov r13, gs:[{t} + {off_r13}]",
+        "mov r14, gs:[{t} + {off_r14}]",
+        "mov r15, gs:[{t} + {off_r15}]",
+        "push qword ptr gs:[{t} + {off_ss}]",
+        "push qword ptr gs:[{t} + {off_rsp}]",
+        "push qword ptr gs:[{t} + {off_rflags}]",
+        "push qword ptr gs:[{t} + {off_cs}]",
+        "push qword ptr gs:[{t} + {off_rip}]",
+        "swapgs",
         "iretq",
-        t = sym IRET_TRAP,
-        fx = sym IRET_FX,
+        t = const core::mem::offset_of!(PerCpu, iret_trap),
+        fx = const core::mem::offset_of!(PerCpu, iret_fx),
         off_rax = const core::mem::offset_of!(TrapFrame, rax),
         off_rbx = const core::mem::offset_of!(TrapFrame, rbx),
         off_rcx = const core::mem::offset_of!(TrapFrame, rcx),
@@ -571,6 +551,7 @@ pub unsafe extern "C" fn lapic_timer_entry() {
         "pop rax",
         "iretq",
         "2:",
+        "swapgs",
         "push r15",
         "push r14",
         "push r13",
@@ -586,13 +567,13 @@ pub unsafe extern "C" fn lapic_timer_entry() {
         "push rcx",
         "push rbx",
         "push rax",
-        "mov rdx, [{fxptr}]",
+        "mov rdx, gs:[{fxptr}]",
         "fxsave64 [rdx]",
         "mov rdi, rsp",
         "push rax",
         "call {user}",
         "add rsp, 8",
-        "mov rdx, [{fxptr}]",
+        "mov rdx, gs:[{fxptr}]",
         "fxrstor64 [rdx]",
         "pop rax",
         "pop rbx",
@@ -609,9 +590,10 @@ pub unsafe extern "C" fn lapic_timer_entry() {
         "pop r13",
         "pop r14",
         "pop r15",
+        "swapgs",
         "iretq",
         kern = sym timer_kernel,
         user = sym timer_from_user,
-        fxptr = sym FXSAVE_PTR,
+        fxptr = const core::mem::offset_of!(PerCpu, fxsave_ptr),
     );
 }

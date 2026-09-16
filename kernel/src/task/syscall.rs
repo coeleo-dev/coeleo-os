@@ -35,23 +35,21 @@ pub const SYS_INSTALL: u64 = 24;
 pub const SYS_PIPE: u64 = 25;
 pub const SYS_MKDIR: u64 = 26;
 pub const SYS_CLIPBOARD: u64 = 27;
-
-#[repr(C)]
-pub struct CpuLocal {
-    pub kernel_rsp: u64,
-    pub user_rsp: u64,
-}
-
-pub static mut CPU_LOCAL: CpuLocal = CpuLocal {
-    kernel_rsp: 0,
-    user_rsp: 0,
-};
+pub const SYS_THREAD_CREATE: u64 = 28;
 
 pub fn init() {
+    init_cpu(0);
+}
+
+/// Per-CPU `syscall`/`sysretq` setup: GS convention + the MSRs that hold the
+/// trampoline. Runs on the BSP and every AP.
+pub fn init_cpu(cpu: usize) {
     unsafe {
-        CPU_LOCAL.kernel_rsp = crate::gdt::user_kernel_stack_top().as_u64();
-        GsBase::write(VirtAddr::zero());
-        KernelGsBase::write(VirtAddr::from_ptr(&raw const CPU_LOCAL));
+        // While in kernel mode GS points at `PERCPU[cpu]`; user mode gets GS=0
+        // and the kernel pointer lives in `KERNEL_GS_BASE` (swapped by `swapgs`).
+        crate::percpu::PERCPU[cpu].kernel_rsp = crate::gdt::user_kernel_stack_top(cpu).as_u64();
+        GsBase::write(VirtAddr::from_ptr(&raw const crate::percpu::PERCPU[cpu]));
+        KernelGsBase::write(VirtAddr::zero());
         Efer::update(|f| {
             f.insert(EferFlags::SYSTEM_CALL_EXTENSIONS | EferFlags::NO_EXECUTE_ENABLE);
         });
@@ -86,8 +84,8 @@ unsafe extern "C" fn syscall_entry() {
         "mov rsp, gs:[{user}]",
         "swapgs",
         "sysretq",
-        user = const core::mem::offset_of!(CpuLocal, user_rsp),
-        kern = const core::mem::offset_of!(CpuLocal, kernel_rsp),
+        user = const core::mem::offset_of!(crate::percpu::PerCpu, user_rsp),
+        kern = const core::mem::offset_of!(crate::percpu::PerCpu, kernel_rsp),
         dispatch = sym syscall_dispatch,
     );
 }
@@ -122,6 +120,7 @@ extern "C" fn syscall_dispatch(num: u64, a0: u64, a1: u64, a2: u64) -> u64 {
         SYS_PIPE => crate::fd::sys_pipe(a0),
         SYS_MKDIR => crate::fd::sys_mkdir(a0, a1),
         SYS_CLIPBOARD => crate::comp::clip::sys_clipboard(a0, a1, a2),
+        SYS_THREAD_CREATE => crate::sched::sys_thread_create(a0),
         _ => u64::MAX,
     }
 }

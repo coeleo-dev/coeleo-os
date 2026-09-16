@@ -1,4 +1,21 @@
 //! Higher-half direct map and the Limine page tables.
+//!
+//! ## SMP / TLB-shootdown invariant
+//!
+//! All CPUs share one kernel address space: Limine's L4 has its kernel half
+//! (entries 256..512) pointing at shared L3/L2/L1 tables, and
+//! [`new_user_l4`] copies those same kernel-half entries into every user L4.
+//! That means a late mutation of the *kernel* half is instantly visible to all
+//! CPUs' page tables, but a CPU that has already cached the old translation in
+//! its TLB will not see it.
+//!
+//! Today this is safe without a shootdown because every kernel-half mapping
+//! (`map_mmio`, `map_user`, `unmap_user`) happens on the BSP at boot, before
+//! any AP starts, and `map_*`/`unmap_*` call `flush.flush()` on the local CPU.
+//! When a mapping is first created or torn down *after* APs are running, the
+//! caller must (a) propagate the change to every live user L4 — kernel-half
+//! changes are automatic, user-half changes are not — and (b) shoot down the
+//! stale TLB entry on the other CPUs (an IPI into a per-CPU `invlpg`).
 
 use alloc::vec::Vec;
 use core::sync::atomic::{AtomicU64, Ordering};

@@ -17,6 +17,7 @@ members = [
     "apps/winprobe",
     "apps/widgets",
     "apps/install",
+    "apps/threads",
 ]
 resolver = "3"
 

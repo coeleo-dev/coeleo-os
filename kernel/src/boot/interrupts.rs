@@ -1,5 +1,7 @@
 //! IDT, PIC 8259 (keyboard), and LAPIC timer vector.
 
+use core::arch::naked_asm;
+
 use pic8259::ChainedPics;
 use spin::{Mutex, Once};
 use x86_64::PrivilegeLevel;
@@ -20,7 +22,7 @@ static PICS: Mutex<ChainedPics> =
 
 static IDT: Once<InterruptDescriptorTable> = Once::new();
 
-pub fn init() {
+pub fn init_bsp() {
     let idt = IDT.call_once(build_idt);
     idt.load();
 
@@ -29,6 +31,11 @@ pub fn init() {
         pics.initialize();
         pics.write_masks(0xFF, 0xFF);
     }
+}
+
+/// Load the shared IDT on a CPU. APs reuse the BSP-built table.
+pub fn load_idt() {
+    IDT.get().expect("idt").load();
 }
 
 pub fn unmask_ps2() {
@@ -102,7 +109,11 @@ fn build_idt() -> InterruptDescriptorTable {
     idt.vmm_communication_exception
         .set_handler_fn(vmm_communication_exception);
     idt.security_exception.set_handler_fn(security_exception);
-    idt[KEYBOARD_VECTOR].set_handler_fn(keyboard_interrupt);
+    unsafe {
+        idt[KEYBOARD_VECTOR].set_handler_addr(VirtAddr::new(
+            keyboard_entry as *const () as usize as u64,
+        ));
+    }
     idt[MOUSE_VECTOR].set_handler_fn(mouse_interrupt);
     idt[SPURIOUS_MASTER].set_handler_fn(spurious_master);
     unsafe {
@@ -130,7 +141,58 @@ fn write_u8(n: u8) {
     }
 }
 
-extern "x86-interrupt" fn keyboard_interrupt(_frame: InterruptStackFrame) {
+/// Naked keyboard entry: swap GS when the IRQ came from Ring 3 so the handler
+/// can reach per-CPU state through `gs`.
+#[unsafe(naked)]
+unsafe extern "C" fn keyboard_entry() {
+    naked_asm!(
+        "test qword ptr [rsp + 8], 3",
+        "jz 2f",
+        "swapgs",
+        "2:",
+        "push r15",
+        "push r14",
+        "push r13",
+        "push r12",
+        "push r11",
+        "push r10",
+        "push r9",
+        "push r8",
+        "push rbp",
+        "push rdi",
+        "push rsi",
+        "push rdx",
+        "push rcx",
+        "push rbx",
+        "push rax",
+        "push rax",
+        "call {handler}",
+        "add rsp, 8",
+        "pop rax",
+        "pop rbx",
+        "pop rcx",
+        "pop rdx",
+        "pop rsi",
+        "pop rdi",
+        "pop rbp",
+        "pop r8",
+        "pop r9",
+        "pop r10",
+        "pop r11",
+        "pop r12",
+        "pop r13",
+        "pop r14",
+        "pop r15",
+        "test qword ptr [rsp + 8], 3",
+        "jz 3f",
+        "swapgs",
+        "3:",
+        "iretq",
+        handler = sym keyboard_handler,
+    );
+}
+
+extern "C" fn keyboard_handler() {
     ps2::irq();
     crate::kbd::drain_ps2();
     eoi(KEYBOARD_VECTOR);

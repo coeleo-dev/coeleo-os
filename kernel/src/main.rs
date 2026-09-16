@@ -8,8 +8,8 @@ use core::fmt::Write;
 
 use limine::BaseRevision;
 use limine::request::{
-    ExecutableAddressRequest, FramebufferRequest, HhdmRequest, MemoryMapRequest, RequestsEndMarker,
-    RequestsStartMarker, RsdpRequest,
+    ExecutableAddressRequest, FramebufferRequest, HhdmRequest, MemoryMapRequest, MpRequest,
+    RequestsEndMarker, RequestsStartMarker, RsdpRequest,
 };
 
 mod boot;
@@ -22,13 +22,15 @@ mod task;
 mod ui;
 
 #[allow(unused_imports)]
-pub(crate) use boot::{acpi, console, gdt, init, interrupts, kdebug, lapic, rtc, serial, shell};
+pub(crate) use boot::{
+    acpi, console, gdt, init, interrupts, irqlock, kdebug, lapic, rtc, serial, shell, smp,
+};
 pub(crate) use bus::{pci, xhci};
 pub(crate) use fs::{ahci, blk, fat_disk, gpt, install, part, usb_msc};
 pub(crate) use input::{kbd, mouse, ps2, uhci, usb_hid};
 pub(crate) use mem::{heap, pmm, vmm};
 pub(crate) use net::{e1000e, http, virtio_hal, virtio_net, virtio_pci};
-pub(crate) use task::{elfload, fd, pipe, process, sched, syscall};
+pub(crate) use task::{elfload, fd, percpu, pipe, process, sched, syscall};
 #[allow(unused_imports)]
 pub(crate) use ui::font8x16;
 pub(crate) use ui::{clock, comp, desk, deskset, fbterm, fm, krunner, panel, splash, win};
@@ -59,6 +61,10 @@ static EXECUTABLE_ADDRESS_REQUEST: ExecutableAddressRequest = ExecutableAddressR
 #[used]
 #[unsafe(link_section = ".requests")]
 static RSDP_REQUEST: RsdpRequest = RsdpRequest::new();
+
+#[used]
+#[unsafe(link_section = ".requests")]
+static MP_REQUEST: MpRequest = MpRequest::new();
 
 #[used]
 #[unsafe(link_section = ".requests_start_marker")]
@@ -97,12 +103,21 @@ unsafe extern "C" fn kmain() -> ! {
     pmm::init(memmap.entries());
     heap::init();
     splash::start();
-    gdt::init();
-    interrupts::init();
+    gdt::init_bsp();
+    interrupts::init_bsp();
     acpi::init(RSDP_REQUEST.get_response().map(|r| r.address()));
     syscall::init();
     sched::init();
-    lapic::init();
+    sched::init_template();
+    lapic::init_bsp();
+    if let Some(mp) = MP_REQUEST.get_response() {
+        let cpus = mp.cpus().len();
+        let bsp = mp.bsp_lapic_id();
+        let started = smp::start_aps(mp);
+        serial_println!("smp: {cpus} cpus, bsp apic {bsp}, {started} aps");
+    } else {
+        serial::write_str("smp: no mp response\n");
+    }
     blk::init();
     splash::tick();
     net::init();
@@ -135,13 +150,9 @@ unsafe extern "C" fn kmain() -> ! {
         while let Some(b) = kbd::pop_byte() {
             shell::handle_byte(b);
         }
-        serial::write_str("kmain: comp::poll\n");
         comp::poll();
-        serial::write_str("kmain: net::poll\n");
         net::poll();
-        serial::write_str("kmain: clock::paint\n");
         clock::paint_if_second_elapsed();
-        // serial::write_str("kmain: wait\n"); // too noisy
         interrupts::wait();
     }
 }

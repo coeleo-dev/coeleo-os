@@ -41,6 +41,18 @@ run-uefi: edk2-ovmf $(IMAGE_NAME).iso ensure-fat32-disk
 		$(USB_MOUSE) \
 		$(QEMUFLAGS)
 
+.PHONY: run-smp
+run-smp: edk2-ovmf $(IMAGE_NAME).iso ensure-fat32-disk
+	qemu-system-x86_64 \
+		-M q35 \
+		-drive if=pflash,unit=0,format=raw,file=edk2-ovmf/ovmf-code-x86_64.fd,readonly=on \
+		-cdrom $(IMAGE_NAME).iso \
+		$(VIRTIO_BLK) \
+		$(VIRTIO_NET) \
+		$(USB_MOUSE) \
+		$(QEMUFLAGS) \
+		-smp 2
+
 .PHONY: run-e1000e
 run-e1000e: edk2-ovmf $(IMAGE_NAME).iso ensure-fat32-disk
 	qemu-system-x86_64 \
@@ -232,6 +244,7 @@ $(DISK_IMG): userspace
 	MTOOLS_SKIP_CHECK=1 mcopy -i $@ userspace/apps/winprobe/winprobe ::winprobe
 	MTOOLS_SKIP_CHECK=1 mcopy -i $@ userspace/apps/widgets/widgets ::widgets
 	MTOOLS_SKIP_CHECK=1 mcopy -i $@ userspace/apps/install/install ::install
+	MTOOLS_SKIP_CHECK=1 mcopy -i $@ userspace/apps/threads/threads ::threads
 	MTOOLS_SKIP_CHECK=1 mcopy -i $@ userspace/libs/pkg/hello.coe ::pacotes/hello.coe
 	MTOOLS_SKIP_CHECK=1 mcopy -i $@ disk-seed/wallpapers/*.png ::wallpapers/
 
@@ -255,6 +268,7 @@ ensure-fat32-disk: userspace
 		&& MTOOLS_SKIP_CHECK=1 mcopy -o -i $(DISK_IMG) userspace/apps/winprobe/winprobe ::winprobe \
 		&& MTOOLS_SKIP_CHECK=1 mcopy -o -i $(DISK_IMG) userspace/apps/widgets/widgets ::widgets \
 		&& MTOOLS_SKIP_CHECK=1 mcopy -o -i $(DISK_IMG) userspace/apps/install/install ::install \
+		&& MTOOLS_SKIP_CHECK=1 mcopy -o -i $(DISK_IMG) userspace/apps/threads/threads ::threads \
 		&& MTOOLS_SKIP_CHECK=1 mcopy -o -i $(DISK_IMG) userspace/libs/pkg/hello.coe ::pacotes/hello.coe \
 		&& MTOOLS_SKIP_CHECK=1 mcopy -o -i $(DISK_IMG) disk-seed/wallpapers/*.png ::wallpapers/ \
 		&& ok=1; \
@@ -392,6 +406,14 @@ test-phase9: $(IMAGE_NAME).iso userspace
 .PHONY: test-phase10
 test-phase10: $(IMAGE_NAME).iso userspace
 	python3 scripts/test-phase10.py $(IMAGE_NAME).iso userspace/apps/sh/sh userspace/apps/clock/clock userspace/apps/spin/spin userspace/apps/hello/hello
+
+.PHONY: test-phase35
+test-phase35: $(IMAGE_NAME).iso userspace
+	python3 scripts/test-phase35.py $(IMAGE_NAME).iso userspace/apps/sh/sh userspace/apps/clock/clock userspace/apps/hello/hello
+
+.PHONY: test-phase36
+test-phase36: $(IMAGE_NAME).iso userspace
+	python3 scripts/test-phase36.py $(IMAGE_NAME).iso userspace/apps/sh/sh userspace/apps/threads/threads
 
 .PHONY: test-phase20
 test-phase20: $(IMAGE_NAME).iso userspace

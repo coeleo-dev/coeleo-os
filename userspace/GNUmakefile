@@ -19,7 +19,8 @@ all:
 	cp target/$(TARGET)/$(PROFILE_DIR)/winprobe apps/winprobe/winprobe
 	cp target/$(TARGET)/$(PROFILE_DIR)/widgets apps/widgets/widgets
 	cp target/$(TARGET)/$(PROFILE_DIR)/install apps/install/install
-	strip -s apps/hello/hello apps/fault/fault apps/sh/sh apps/ls/ls apps/cat/cat apps/echo/echo apps/edit/edit apps/clock/clock apps/spin/spin apps/winprobe/winprobe apps/widgets/widgets apps/install/install
+	cp target/$(TARGET)/$(PROFILE_DIR)/threads apps/threads/threads
+	strip -s apps/hello/hello apps/fault/fault apps/sh/sh apps/ls/ls apps/cat/cat apps/echo/echo apps/edit/edit apps/clock/clock apps/spin/spin apps/winprobe/winprobe apps/widgets/widgets apps/install/install apps/threads/threads
 	$(MAKE) -C ../tools/coe-pack
 	../tools/coe-pack/target/release/coe-pack pack hello apps/hello/hello -o libs/pkg/hello.coe
 	../tools/coe-pack/target/release/coe-pack bad hello apps/hello/hello -o libs/pkg/bad.coe
@@ -27,5 +28,5 @@ all:
 .PHONY: clean
 clean:
 	cargo clean
-	rm -f apps/hello/hello apps/fault/fault apps/sh/sh apps/ls/ls apps/cat/cat apps/echo/echo apps/edit/edit apps/clock/clock apps/spin/spin apps/winprobe/winprobe apps/widgets/widgets apps/install/install
+	rm -f apps/hello/hello apps/fault/fault apps/sh/sh apps/ls/ls apps/cat/cat apps/echo/echo apps/edit/edit apps/clock/clock apps/spin/spin apps/winprobe/winprobe apps/widgets/widgets apps/install/install apps/threads/threads
 	rm -f libs/pkg/hello.coe libs/pkg/bad.coe
