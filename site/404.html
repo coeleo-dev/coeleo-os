@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Page not found — Coeleo OS</title>
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#0F1218">
+<meta name="color-scheme" content="dark">
+
+<!--
+  Paths here are absolute on purpose. This page is served for any missing URL,
+  including deep ones like /coeleo-os/a/b/c, so relative paths would resolve
+  against the wrong directory and the stylesheet would 404.
+-->
+<link rel="icon" href="/coeleo-os/assets/img/logo.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/coeleo-os/assets/img/icon.png">
+<link rel="stylesheet" href="/coeleo-os/assets/css/style.css">
+
+<style>
+  .nf { min-height: 100vh; display: grid; place-items: center; padding: 4rem 0; }
+  .nf__code {
+    font: 700 clamp(3.5rem, 12vw, 7rem)/1 var(--mono);
+    color: var(--accent); letter-spacing: -.03em; margin: 0;
+  }
+  .nf__title { font-size: clamp(1.35rem, 3vw, 1.8rem); margin: .6rem 0 .7rem; }
+  .nf__lead { color: var(--dim); max-width: 62ch; margin: 0 0 1.8rem; }
+  .nf__actions { display: flex; flex-wrap: wrap; gap: .7rem; }
+  .nf__hint {
+    margin-top: 2.5rem; padding-top: 1.2rem; border-top: 1px solid var(--border);
+    color: var(--dim); font-size: .88rem;
+  }
+</style>
+</head>
+<body>
+
+<main class="wrap nf" id="main">
+  <div>
+    <p class="nf__code">404</p>
+    <h1 class="nf__title">This page is not in the image</h1>
+    <p class="nf__lead">
+      The address you followed does not exist on this site. Nothing is broken on your
+      side — the link is either outdated or mistyped.
+    </p>
+
+    <div class="nf__actions">
+      <a class="btn btn--primary" href="/coeleo-os/">Back to the overview</a>
+      <a class="btn" href="/coeleo-os/#roadmap">Read the roadmap</a>
+      <a class="btn btn--ghost" href="https://github.com/coeleo-dev/coeleo-os" target="_blank" rel="noopener">Browse the source</a>
+    </div>
+
+    <p class="nf__hint">
+      Looking for the documentation? It lives in the repository under
+      <a href="https://github.com/coeleo-dev/coeleo-os/tree/main/docs/contrib" target="_blank" rel="noopener"><code>docs/contrib/</code></a>.
+    </p>
+  </div>
+</main>
+
+</body>
+</html>
