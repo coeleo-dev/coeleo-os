@@ -6,8 +6,8 @@ use crate::err;
 pub fn cmd_head(cwd: &Cwd, args: &str) {
     let (lines_limit, path_arg) = parse_line_limit(args, 10);
     if path_arg.is_empty() {
-        err::err("head", "caminho de arquivo ausente");
-        err::usage("head", "[-n linhas] <arquivo>");
+        err::err("head", "missing file path");
+        err::usage("head", "[-n lines] <file>");
         return;
     }
     let mut abs = [0u8; 256];
@@ -15,13 +15,13 @@ pub fn cmd_head(cwd: &Cwd, args: &str) {
     let fd = open(path, OPEN_READ);
     if fd == ERR {
         let _ = write(1, b"head: not found\n");
-        err::err_target("head", path_arg, "arquivo não encontrado");
+        err::err_target("head", path_arg, "file not found");
         return;
     }
     let mut probe = [0u8; DIRENT_SIZE];
     if readdir(fd, &mut probe) != ERR {
         let _ = close(fd);
-        err::err_target("head", path_arg, "é um diretório");
+        err::err_target("head", path_arg, "is a directory");
         return;
     }
 
@@ -57,8 +57,8 @@ pub fn cmd_head(cwd: &Cwd, args: &str) {
 pub fn cmd_tail(cwd: &Cwd, args: &str) {
     let (lines_limit, path_arg) = parse_line_limit(args, 10);
     if path_arg.is_empty() {
-        err::err("tail", "caminho de arquivo ausente");
-        err::usage("tail", "[-n linhas] <arquivo>");
+        err::err("tail", "missing file path");
+        err::usage("tail", "[-n lines] <file>");
         return;
     }
     let mut abs = [0u8; 256];
@@ -66,13 +66,13 @@ pub fn cmd_tail(cwd: &Cwd, args: &str) {
     let fd = open(path, OPEN_READ);
     if fd == ERR {
         let _ = write(1, b"tail: not found\n");
-        err::err_target("tail", path_arg, "arquivo não encontrado");
+        err::err_target("tail", path_arg, "file not found");
         return;
     }
     let mut probe = [0u8; DIRENT_SIZE];
     if readdir(fd, &mut probe) != ERR {
         let _ = close(fd);
-        err::err_target("tail", path_arg, "é um diretório");
+        err::err_target("tail", path_arg, "is a directory");
         return;
     }
 
@@ -137,8 +137,8 @@ pub fn cmd_wc(cwd: &Cwd, args: &str) {
                     b'w' => opt_w = true,
                     b'c' => opt_c = true,
                     _ => {
-                        err::err("wc", "opção inválida");
-                        err::usage("wc", "[-l] [-w] [-c] <arquivo>");
+                        err::err("wc", "invalid option");
+                        err::usage("wc", "[-l] [-w] [-c] <file>");
                         return;
                     }
                 }
@@ -155,8 +155,8 @@ pub fn cmd_wc(cwd: &Cwd, args: &str) {
     }
 
     if path_arg.is_empty() {
-        err::err("wc", "caminho de arquivo ausente");
-        err::usage("wc", "[-l] [-w] [-c] <arquivo>");
+        err::err("wc", "missing file path");
+        err::usage("wc", "[-l] [-w] [-c] <file>");
         return;
     }
 
@@ -165,7 +165,7 @@ pub fn cmd_wc(cwd: &Cwd, args: &str) {
     let fd = open(path, OPEN_READ);
     if fd == ERR {
         let _ = write(1, b"wc: not found\n");
-        err::err_target("wc", path_arg, "arquivo não encontrado");
+        err::err_target("wc", path_arg, "file not found");
         return;
     }
 
@@ -236,8 +236,8 @@ pub fn cmd_grep(cwd: &Cwd, args: &str) {
     }
 
     if pattern.is_empty() {
-        err::err("grep", "termo de busca obrigatório ausente");
-        err::usage("grep", "[-i] [-n] [-v] <termo> [arquivo]");
+        err::err("grep", "missing search term");
+        err::usage("grep", "[-i] [-n] [-v] <term> [file]");
         return;
     }
 
@@ -249,7 +249,7 @@ pub fn cmd_grep(cwd: &Cwd, args: &str) {
         let f = open(path, OPEN_READ);
         if f == ERR {
             let _ = write(1, b"grep: not found\n");
-            err::err_target("grep", path_arg, "arquivo não encontrado");
+            err::err_target("grep", path_arg, "file not found");
             return;
         }
         f
@@ -391,8 +391,8 @@ fn print_highlighted(haystack: &str, needle: &str, ignore_case: bool) {
 pub fn cmd_stat(cwd: &Cwd, args: &str) {
     let path_arg = args.split_whitespace().next().unwrap_or("");
     if path_arg.is_empty() {
-        err::err("stat", "caminho de arquivo ausente");
-        err::usage("stat", "<caminho>");
+        err::err("stat", "missing file path");
+        err::usage("stat", "<path>");
         return;
     }
     let mut abs = [0u8; 256];
@@ -400,7 +400,7 @@ pub fn cmd_stat(cwd: &Cwd, args: &str) {
     let fd = open(path, OPEN_READ);
     if fd == ERR {
         let _ = write(1, b"stat: not found\n");
-        err::err_target("stat", path_arg, "arquivo ou diretório não encontrado");
+        err::err_target("stat", path_arg, "file or directory not found");
         return;
     }
     let mut probe = [0u8; DIRENT_SIZE];
@@ -419,16 +419,16 @@ pub fn cmd_stat(cwd: &Cwd, args: &str) {
     }
     let _ = close(fd);
 
-    let _ = write(1, b"  \x1b[1mArquivo:\x1b[0m ");
+    let _ = write(1, b"     \x1b[1mFile:\x1b[0m ");
     let _ = write(1, path.as_bytes());
     let _ = write(1, b"\n");
 
-    let _ = write(1, b"     \x1b[1mTipo:\x1b[0m ");
+    let _ = write(1, b"     \x1b[1mType:\x1b[0m ");
     if is_dir {
-        let _ = write(1, b"\x1b[1;34mDiret\xc3\xb3rio\x1b[0m\n");
+        let _ = write(1, b"\x1b[1;34mDirectory\x1b[0m\n");
     } else {
-        let _ = write(1, b"Arquivo Regular\n");
-        let _ = write(1, b"  \x1b[1mTamanho:\x1b[0m ");
+        let _ = write(1, b"Regular File\n");
+        let _ = write(1, b"     \x1b[1mSize:\x1b[0m ");
         print_num(bytes);
         let _ = write(1, b" bytes");
         if bytes >= 1024 {

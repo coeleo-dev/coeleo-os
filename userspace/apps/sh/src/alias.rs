@@ -91,7 +91,7 @@ impl AliasTable {
 
     pub fn list(&self) {
         if self.count == 0 {
-            let _ = write(1, b"(nenhum alias definido)\n");
+            let _ = write(1, b"(no aliases defined)\n");
             return;
         }
         for i in 0..self.count {
@@ -116,41 +116,41 @@ pub fn cmd_alias(table: &mut AliasTable, args: &str) {
         let name = name.trim();
         let val = val.trim().trim_matches('\'').trim_matches('"');
         if table.set(name, val) {
-            let _ = write(1, b"alias configurado: ");
+            let _ = write(1, b"alias set: ");
             let _ = write(1, name.as_bytes());
             let _ = write(1, b" -> '");
             let _ = write(1, val.as_bytes());
             let _ = write(1, b"'\n");
         } else {
-            err::err("alias", "tabela de aliases cheia ou identificador muito longo");
+            err::err("alias", "alias table full or identifier too long");
         }
     } else {
-        err::err("alias", "sintaxe inválida");
-        err::usage("alias", "[nome='comando']");
+        err::err("alias", "invalid syntax");
+        err::usage("alias", "[name='command']");
     }
 }
 
 pub fn cmd_unalias(table: &mut AliasTable, args: &str) {
     let name = args.split_whitespace().next().unwrap_or("");
     if name.is_empty() {
-        err::err("unalias", "informe o nome do alias a ser removido");
-        err::usage("unalias", "<nome>");
+        err::err("unalias", "missing alias name to remove");
+        err::usage("unalias", "<name>");
         return;
     }
     if table.remove(name) {
-        let _ = write(1, b"alias removido: ");
+        let _ = write(1, b"alias removed: ");
         let _ = write(1, name.as_bytes());
         let _ = write(1, b"\n");
     } else {
-        err::err_target("unalias", name, "alias não encontrado");
+        err::err_target("unalias", name, "alias not found");
     }
 }
 
 pub fn cmd_which(table: &AliasTable, args: &str) {
     let cmd = args.split_whitespace().next().unwrap_or("");
     if cmd.is_empty() {
-        err::err("which", "informe o nome do comando");
-        err::usage("which", "<comando>");
+        err::err("which", "missing command name");
+        err::usage("which", "<command>");
         return;
     }
     if let Some(alias_val) = table.get(cmd) {
@@ -182,18 +182,18 @@ pub fn cmd_which(table: &AliasTable, args: &str) {
     }
 
     let _ = write(1, cmd.as_bytes());
-    let _ = write(1, b" n\xc3\xa3o encontrado\n");
+    let _ = write(1, b" not found\n");
 }
 
 pub fn cmd_history(hist: &mut History, args: &str) {
     if args.split_whitespace().any(|a| a == "-c" || a == "--clear") {
         hist.clear();
-        let _ = write(1, b"hist\xc3\xb3rico limpo\n");
+        let _ = write(1, b"history cleared\n");
         return;
     }
     let count = hist.count();
     if count == 0 {
-        let _ = write(1, b"(hist\xc3\xb3rico vazio)\n");
+        let _ = write(1, b"(history empty)\n");
         return;
     }
     let mut tmp = [0u8; 128];

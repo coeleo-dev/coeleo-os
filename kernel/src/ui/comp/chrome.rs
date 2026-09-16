@@ -400,14 +400,14 @@ pub(super) fn runner_launch(st: &mut State, row: usize) {
             serial::write_str(&name);
             serial::write_str("\n");
             if name == "hello" {
-                show_toast(st, "hello: executado no terminal");
+                show_toast(st, "hello: ran in the terminal");
             } else if name == "winprobe" {
-                show_toast(st, "winprobe: teste unitario executado");
+                show_toast(st, "winprobe: unit test ran");
             }
         }
         None => {
             serial::write_str("run: not found\n");
-            show_toast(st, "Comando nao encontrado");
+            show_toast(st, "Command not found");
         }
     }
 }
@@ -437,12 +437,12 @@ pub(super) fn launch_index(st: &mut State, row: usize) {
     }
     let res = spawn_app(&name);
     if res.is_none() {
-        show_toast(st, "Falha ao iniciar app");
+        show_toast(st, "Failed to start app");
     } else {
         if name == "hello" {
-            show_toast(st, "hello: executado no terminal");
+            show_toast(st, "hello: ran in the terminal");
         } else if name == "winprobe" {
-            show_toast(st, "winprobe: teste unitario executado");
+            show_toast(st, "winprobe: unit test ran");
         }
     }
 }

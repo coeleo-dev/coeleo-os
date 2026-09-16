@@ -99,7 +99,7 @@ It targets resource-constrained PCs: a single core, ~512 MiB of RAM, a software 
   - In-memory alias manager (`alias ll='ls -l'`, `alias ..='cd ..'`), `unalias`, and `which`.
   - Script batch execution with `source <file.sh>` or `. <file.sh>`.
 - **User-Friendly Error Architecture**:
-  - Semantically styled prefixes (`erro:`, `aviso:`, `dica:`, `uso:`).
+  - Semantically styled prefixes (`error:`, `warning:`, `tip:`, `usage:`).
   - Target-specific contextual descriptions.
   - Levenshtein-based intelligent suggestion engine ("Did you mean...?").
 
