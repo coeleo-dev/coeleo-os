@@ -34,6 +34,7 @@ At the repository root:
 | `make userspace` | ELFs + `hello.coe` / `bad.coe` |
 | `make run` | ISO + QEMU UEFI + virtio-blk + virtio-net + USB mouse |
 | `make run-ahci` | ISO + QEMU UEFI + SATA (`disk-ahci.img`), no virtio-blk |
+| `make site` | regenerate `site/` from `tools/site-gen/content.json` |
 
 The kernel makefile sets:
 
@@ -56,6 +57,23 @@ make -C tools/coe-pack
 ```
 
 `make userspace` already calls `make -C tools/coe-pack` and produces `userspace/libs/pkg/hello.coe` and `bad.coe`.
+
+## Website
+
+`site/` is published by [`.github/workflows/static.yml`](../../.github/workflows/static.yml) as a static artifact — the workflow uploads `site/` as-is, with no build step. `site/index.html`, `site/pt/index.html`, `site/sitemap.xml`, `site/llms.txt` and `site/llms-full.txt` are **generated** and must not be edited by hand.
+
+Edit the copy in [`tools/site-gen/content.json`](../../tools/site-gen/content.json) instead: `site` holds the URLs and locales, `shared` the structure that does not translate (link URLs, `make` commands, screenshot files, phase numbers) and `i18n.<locale>` the text. Then:
+
+```sh
+make site        # regenerate site/
+make site-check  # fail if site/ has drifted from content.json
+```
+
+The generator is Python 3 with the standard library only. It refuses to run when a string is missing from one of the locales, and it checks that every relative link it emits resolves to a real file. Copy is emitted as trusted HTML, so it may contain `<code>` and `<kbd>`; values used in attributes (`title`, `alt`, meta tags) and the FAQ answers must stay plain text.
+
+`site/robots.txt` and `site/404.html` are hand-written — they change rarely, and generating them would add churn for no gain.
+
+Changing the English copy means changing the pt-BR translation in the same step; `make site-check` is the gate.
 
 ## FAT disks
 

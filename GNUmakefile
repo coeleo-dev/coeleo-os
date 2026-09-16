@@ -170,6 +170,19 @@ kernel:
 userspace:
 	$(MAKE) -C userspace
 
+# Regenerate site/ from tools/site-gen/content.json. Like tools/gen_wall_thumbs.py,
+# this is codegen whose output is committed - the Pages workflow uploads site/ as-is
+# and needs no toolchain, so nothing here runs in CI.
+.PHONY: site
+site:
+	python3 tools/site-gen/gen.py
+
+# Fail if site/ drifts from content.json. Reads only; safe to run in CI.
+.PHONY: site-check
+site-check:
+	python3 tools/site-gen/gen.py
+	git diff --exit-code -- site/
+
 $(IMAGE_NAME).iso: limine/limine kernel
 	rm -rf iso_root
 	mkdir -p iso_root/boot

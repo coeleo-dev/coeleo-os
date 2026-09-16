@@ -1,0 +1,196 @@
+# Coeleo OS — full reference
+
+> Coeleo OS is a from-scratch x86_64 operating system written in Rust: its own kernel, syscall ABI, software compositor, shell and userspace, built in a single repository. It is not a Linux distribution and does not use the Linux kernel.
+
+## Overview
+
+- Target: x86_64, single core, ~512 MiB RAM, software linear framebuffer, no 3D GPU.
+- Boot: Limine, on UEFI and legacy BIOS.
+- Kernel: one Rust crate, folders by domain, no userspace code linked in.
+- Userspace: static no_std ELFs (x86_64-unknown-none) that enter at _start.
+- Syscall ABI: 27 syscalls, reached through the libcoeleo wrappers - the only crossing between rings.
+- Process model: preemptive round-robin on a 100 Hz LAPIC tick, at most 8 concurrent processes, one thread per process.
+- Memory: physical frame bitmap, 4-level paging with strict user/kernel isolation, kernel heap allocator.
+- Storage: FAT32 with cluster allocation and long filenames, over VirtIO-blk, SATA AHCI (GPT) or USB Mass Storage.
+- Network: smoltcp over virtio-net or Intel e1000e, static IPv4 or DHCP, ARP, ICMP echo, DNS A, HTTP client, TLS 1.2/1.3 via rustls.
+- Packages: .coe payloads with Ed25519 signatures and SHA-256 integrity verification.
+- License: MIT OR Apache-2.0.
+
+## What it is not
+
+- Not a Linux distribution and not Unix-compatible: no libc, no dynamic linking, no POSIX ABI.
+- Not derived from Redox, Windows, or an RTOS.
+- No SMP, no threads, no Wi-Fi, no audio, no suspend, no 3D acceleration today.
+
+## Build and run
+
+- Host: Linux with QEMU, make, xorriso, python3, mtools and gdisk.
+- make all - kernel ISO plus userspace ELFs and test packages.
+- make run - UEFI boot with virtio-blk, virtio-net and a USB mouse.
+- Other targets: make run-ahci, run-e1000e, run-usb, run-bios, run-hdd.
+- Tests run QEMU headless and assert against the serial log.
+
+## Reused components
+
+- Limine - bootloader (UEFI and BIOS).
+- Flanterm - terminal emulation.
+- smoltcp - TCP/IP stack.
+- fatfs - FAT32 filesystem.
+- rustls - TLS 1.2/1.3.
+- Everything else (memory, scheduler, compositor, syscalls, shell, UI toolkit, installer, package manager) is implemented in the repository.
+
+## Implemented features
+
+### Kernel and hardware
+
+- Boot and CPU foundation: Limine on UEFI and legacy BIOS, GDT, IDT, LAPIC timer and interrupt routing, ACPI and a civil RTC clock. Context switching lives in naked assembly in one file.
+- Memory management: A physical frame bitmap (PMM), 4-level paging (VMM) with strict user/kernel address-space isolation, and a kernel heap allocator.
+- Preemptive scheduler: Round-robin driven by LAPIC timer interrupts, with a PCB table capped at 8 concurrent processes, zombie reaping and clean resource teardown.
+- Syscall layer: 27 syscalls reached through libcoeleo, covering processes, files, pipes, the network, time, window surfaces, system info and the clipboard.
+- FAT32 and storage: FAT32 with cluster allocation, long filenames, traversal, read, write, truncate and sync. Disk backends: VirtIO-blk, SATA AHCI with GPT partitions, and USB Mass Storage.
+- Networking: smoltcp over virtio-net or Intel e1000e — one PHY, picked at boot. Static IPv4 or DHCP, ARP, ICMP echo, DNS A records, an HTTP client and TLS 1.2/1.3.
+- Input drivers: PS/2 keyboard with full scancode translation and key event dispatch; PS/2 and USB HID mice over UHCI and xHCI controllers.
+
+### Desktop
+
+- Software 2D compositor: Pure CPU linear-framebuffer rendering with dirty-rect clipping and selective damage updates, so only what changed is repainted. No hardware acceleration.
+- One shared design system: Kernel chrome and Ring 3 applications paint from the same palette and metrics (coeleo-theme), with SDF hairline borders, anti-aliased corners and layered shadows.
+- Window management: Floating windows with dragging, 8-direction edge resize, minimise / maximise / close controls, title elision and a glowing accent border on the focused window.
+- Panel and launcher: A floating pill or full-width panel with a live clock and network indicator, plus KRunner (Alt+Space) — a modal overlay with fuzzy search and keyboard navigation.
+- Graphical file manager: An embedded dual-pane explorer with breadcrumb pills, a Places and Devices sidebar, per-file icons and keyboard navigation.
+- Clipboard and notifications: A kernel-level global clipboard behind SYS_CLIPBOARD, shared by the terminal, the shell and GUI apps. Floating rounded toasts report background work, copies and alerts.
+- Wallpaper and settings: Full-screen desktop with solid colours or decoded JPEG/PNG wallpapers, with preferences persisted to the disk across reboots.
+
+### Shell and terminal
+
+- Virtual terminal: A Flanterm terminal embedded in the window, with a 16-colour ANSI palette harmonised with the Slate theme, cursor positioning, bold text and clean blits.
+- Readline-class shell: Line editing with Home/End, word jumps, kill and transpose; a 128-entry history ring, Ctrl+R reverse search, Tab completion, aliases, semicolons, pipes and redirects.
+- Command catalog: 52 builtins across files and directories, text processing (grep, wc, head, tail), processes and memory, storage inspection, packages, networking and power.
+- Errors that help: Semantically styled error:, warning:, tip: and usage: prefixes, target-specific descriptions, and a Levenshtein suggestion engine that asks “did you mean…?”.
+
+### Applications and packages
+
+- Signed packages: Ed25519 signatures and SHA-256 integrity verification for .coe payloads, fetched over plaintext HTTP or TLS and installed from disk or the network.
+- Text editor: edit, a TUI editor on the virtual terminal, with save and quit shortcuts.
+- OS installer: A graphical and CLI installer that deploys the system onto a GPT-partitioned AHCI or USB disk.
+- Immediate-mode UI toolkit: libcoeleoui gives Ring 3 apps the same widget language as the desktop; the widgets binary is a live demo of it.
+
+## Kernel domains
+
+- Boot / CPU (boot/): GDT, IDT, LAPIC, console, ACPI, RTC
+- Memory (mem/): PMM, VMM, kernel heap
+- PCI / USB host (bus/): PCI config space, xHCI
+- Disk / FAT (fs/): FAT32, block layer, GPT, AHCI, USB MSC, installer
+- Network (net/): smoltcp, HTTP, TLS, DHCP, DNS A, virtio-net or e1000e
+- Input (input/): PS/2 keyboard and mouse, UHCI, xHCI HID
+- Desktop (ui/): Compositor, panel, KRunner, file manager, VT, windows
+- Processes (task/): Preemptive scheduler, syscalls, FDs, pipes, ELF loader
+
+## Userspace applications
+
+- sh: Interactive shell: line editing, completion, dynamic prompt, aliases, builtins
+- edit: TUI text editor on the virtual terminal
+- widgets: GUI demo of the immediate-mode libcoeleoui toolkit
+- install: Graphical and CLI installer for GPT / AHCI disks
+- winprobe: Ring 3 surface creation and animation benchmark
+- clock: Background graphical clock process
+- ls · cat · echo: Standalone command-line file utilities
+- hello · fault · spin: Spawn, fault-handling and CPU-loop verification binaries
+
+## Shared libraries
+
+- libcoeleo: Syscall wrappers with an allocation-free, safe API
+- libcoeleoui: Immediate-mode UI widget toolkit
+- coeleo-theme: Design tokens: palette and layout metrics
+- coeleo-draw: 2D primitives: SDF round strokes, text and icons
+- coeleo-image: JPEG and PNG decoding for wallpapers
+- pkg: Ed25519 verification and .coe package handling
+
+## Roadmap
+
+### Leave the PS/2 desk (Next)
+
+Drivers that stop the machine depending on a 1990s port and a legacy disk controller.
+
+- Phase 27, NVMe: The typical internal SSD is not AHCI. This brings the same FAT tree up on a modern drive.
+- Phase 28, USB-Ethernet: Wired networking with no PCI NIC, so a machine with a dongle is not offline.
+
+### Session depth (Then)
+
+What turns a working prompt into a session you can rely on.
+
+- Phase 29, Anonymous mmap and copy IPC: Memory is reached through the library's allocation API today. A general mapping interface is what unlocks the rest of this band.
+- Phase 30, Userspace sockets: The TCP/IP stack lives in the kernel today. Sockets expose TCP to Ring 3 without moving where the stack runs.
+- Phase 31, HTML subset viewer: Render real documents on the OS itself, starting from a defined subset of HTML and CSS.
+- Phase 32, User model: Multi-user sessions and privilege levels, built as a Coeleo-native capability. There are no users or privileges to elevate today.
+- Phase 33, NTP: Set the clock from the network instead of trusting the RTC alone.
+
+### CPU, measured first (Later)
+
+One core and a 100 Hz tick already cover the target envelope, so these wait for a measurement that asks for them.
+
+- Phase 34, Tickless LAPIC: Stop paying for a periodic interrupt when nothing is runnable.
+- Phase 35, Symmetric multiprocessing: Put every core to work, which means rewriting memory and heap locking end to end.
+- Phase 36, Threads inside a process: One thread per process today. Threads need a new PCB, stack and address-space story first.
+
+### Radio, media, laptop (Long term)
+
+Each of these is a project of its own, and each waits on the band above it.
+
+- Phase 37, Wi-Fi: Firmware blobs and 802.11 are where small systems stall, so this lands once wired networking is solid.
+- Phase 38, Audio: No sound device is driven today.
+- Phase 39, Suspend: S3 sleep states, built on the ACPI work already landed.
+- Phase 40, Battery and lid: Power reporting and lid events for laptop use.
+
+### Beyond the reference machine (Vision)
+
+The far horizon: the subsystems that turn a working desktop into a general-purpose platform.
+
+- Phase 41, Compositor and network in Ring 3: Move both out of the kernel, behind inter-process communication.
+- Phase 42, Declarative UI toolkit: A higher-level toolkit for building applications, alongside the immediate-mode one.
+- Phase 43, Tiling window management: A keyboard-driven tiling layout offered next to the floating desktop.
+- Phase 44, EXT4 read and write: A second filesystem, lifting the FAT32 per-file ceiling and adding crash safety.
+- Phase 45, POSIX ABI, relibc and shared objects: Dynamic linking and a familiar ABI so software ported from elsewhere can load.
+- Phase 46, IPv6: Next-generation addressing alongside the IPv4 stack.
+- Phase 47, 3D GPU acceleration: Hardware-accelerated rendering and compute beyond the software framebuffer.
+- Phase 48, 5-level paging and IOMMU: A wider address space, plus DMA isolation for device drivers.
+- Phase 49, HTML and CSS engine: Extend the same engine toward full document layout and richer web content.
+
+## Frequently asked questions
+
+### What is Coeleo OS?
+
+Coeleo OS is a from-scratch x86_64 operating system written in Rust. It has its own kernel, syscall ABI, software compositor, shell and userspace, all built in a single repository. It is not a Linux distribution and does not use the Linux kernel.
+
+### Is Coeleo OS a Linux distribution?
+
+No. Coeleo OS does not use the Linux kernel and ships no Linux userspace. It reuses a few focused third-party components — Limine for boot, Flanterm for terminal emulation, smoltcp for TCP/IP, fatfs for FAT32 and rustls for TLS — and implements the rest itself.
+
+### Does Coeleo OS run on real hardware?
+
+It boots on UEFI and legacy BIOS machines, and the documented development path is QEMU with virtio-blk, virtio-net and USB input. It targets a single core, roughly 512 MiB of RAM and a software linear framebuffer with no 3D GPU.
+
+### How do I build and run Coeleo OS?
+
+On a Linux host with QEMU installed, run "make all" to build the kernel ISO and the userspace ELFs, then "make run" to boot it under UEFI with virtio-blk, virtio-net and a USB mouse. Targets such as make run-ahci, make run-e1000e, make run-usb and make run-bios cover other disk, network and firmware configurations.
+
+### How is Coeleo OS different from Redox OS?
+
+Redox OS is a Unix-like microkernel system with Linux and BSD source compatibility, POSIX support and a ported compiler toolchain. Coeleo OS is smaller in scope and deliberately not Unix-compatible: the kernel is one crate, there is no libc, no dynamic linking and no POSIX ABI, and programs are static no_std ELFs that enter at _start and talk to the kernel through 27 syscalls. A POSIX ABI, relibc and shared objects are on the long-term roadmap, not implemented today.
+
+### What license is Coeleo OS under?
+
+Coeleo OS is distributed under the terms of either the MIT License or the Apache License 2.0, at your option (MIT OR Apache-2.0). Third-party components such as Limine, Flanterm, smoltcp, fatfs and rustls keep their own licenses.
+
+### Does Coeleo OS support multiple CPU cores?
+
+Not yet. The scheduler runs on one core with a 100 Hz LAPIC tick and a process table capped at eight concurrent processes. Symmetric multiprocessing and threads inside a process are on the roadmap but are not implemented.
+
+## Links
+
+- Website: https://coeleo-dev.github.io/coeleo-os/
+- Source: https://github.com/coeleo-dev/coeleo-os
+- Architecture: https://github.com/coeleo-dev/coeleo-os/blob/main/docs/contrib/architecture.md
+- Development guide: https://github.com/coeleo-dev/coeleo-os/blob/main/docs/contrib/develop.md
+
+<!-- Generated by tools/site-gen/gen.py from tools/site-gen/content.json. Do not edit by hand. -->

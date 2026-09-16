@@ -67,6 +67,7 @@ Userspace (workspace in `userspace/Cargo.toml`):
 - New syscall **only when the spec requires it** → table in `kernel/src/task/syscall.rs`; implementation in the owning module (fs, win, sched).
 - New app → `userspace/apps/<name>/`. Shared lib → `userspace/libs/` only when there is a real second consumer.
 - Packer / package keys → `tools/coe-pack/`.
+- Site copy or a new locale → `tools/site-gen/content.json`, then `make site`. `site/*.html`, `sitemap.xml` and `llms*.txt` are generated: editing them by hand is losing the edit at the next run.
 
 ## When to split a file
 

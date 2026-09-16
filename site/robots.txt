@@ -1,2 +1,79 @@
+# Coeleo OS — https://coeleo-dev.github.io/coeleo-os/
+#
+# Everything here is public and free to index, by search engines and by AI
+# agents alike. The groups below are written out explicitly rather than relying
+# on the wildcard, so that a future change of policy is a deliberate edit to a
+# named agent instead of an accident of the `*` group.
+#
+# Machine-readable project summary: /coeleo-os/llms.txt
+
 User-agent: *
+Allow: /
+
+Sitemap: https://coeleo-dev.github.io/coeleo-os/sitemap.xml
+
+# --- Search engines ---------------------------------------------------------
+User-agent: Googlebot
+Allow: /
+
+User-agent: Googlebot-Image
+Allow: /
+
+User-agent: Bingbot
+Allow: /
+
+User-agent: DuckDuckBot
+Allow: /
+
+# --- AI assistants and answer engines ---------------------------------------
+User-agent: Google-Extended
+Allow: /
+
+User-agent: Applebot-Extended
+Allow: /
+
+User-agent: GPTBot
+Allow: /
+
+User-agent: OAI-SearchBot
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: Claude-User
+Allow: /
+
+User-agent: Claude-SearchBot
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Perplexity-User
+Allow: /
+
+User-agent: Amazonbot
+Allow: /
+
+User-agent: Applebot
+Allow: /
+
+User-agent: cohere-ai
+Allow: /
+
+User-agent: meta-externalagent
+Allow: /
+
+User-agent: DuckAssistBot
+Allow: /
+
+User-agent: CCBot
+Allow: /
+
+# --- Archival and datasets --------------------------------------------------
+User-agent: ia_archiver
 Allow: /

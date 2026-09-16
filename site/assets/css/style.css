@@ -123,6 +123,14 @@ kbd {
 }
 .nav__cta:hover { background: var(--hover); border-color: var(--accent); }
 
+/* Language switch: a real link to the other locale, not a JS toggle. */
+.nav__lang {
+  font-weight: 600; letter-spacing: .04em;
+  border: 1px solid var(--border);
+  margin-left: .4rem;
+}
+.nav__lang:hover { border-color: var(--accent); }
+
 .nav__toggle { display: none; margin-left: auto; background: none; border: 0; padding: .5rem; cursor: pointer; }
 .nav__toggle span { display: block; width: 20px; height: 2px; background: var(--text); margin: 4px 0; border-radius: 2px; }
 

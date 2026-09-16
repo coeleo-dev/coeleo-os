@@ -1,0 +1,976 @@
+{
+  "site": {
+    "brand": "Coeleo OS",
+    "baseUrl": "https://coeleo-dev.github.io/coeleo-os/",
+    "repoUrl": "https://github.com/coeleo-dev/coeleo-os",
+    "repoLabel": "coeleo-dev/coeleo-os",
+    "repoBlob": "https://github.com/coeleo-dev/coeleo-os/blob/main/",
+    "ogImage": "assets/img/og.jpg",
+    "iconPng": "assets/img/icon.png",
+    "logo": "assets/img/logo.svg",
+    "author": "Coeleo OS contributors",
+    "defaultLocale": "en",
+    "locales": [
+      { "code": "en", "hreflang": "en", "ogLocale": "en_US", "dir": "", "label": "EN", "longLabel": "English" },
+      { "code": "pt-BR", "hreflang": "pt-BR", "ogLocale": "pt_BR", "dir": "pt/", "label": "PT", "longLabel": "Português" }
+    ]
+  },
+
+  "shared": {
+    "nav": ["features", "screenshots", "architecture", "build", "roadmap", "docs", "faq"],
+
+    "reuse": [
+      { "id": "limine", "name": "Limine", "url": "https://github.com/limine-bootloader/limine" },
+      { "id": "flanterm", "name": "Flanterm", "url": "https://github.com/mintsuki/flanterm" },
+      { "id": "smoltcp", "name": "smoltcp", "url": "https://github.com/smoltcp-rs/smoltcp" },
+      { "id": "fatfs", "name": "fatfs", "url": "https://github.com/rafalh/rust-fatfs" },
+      { "id": "rustls", "name": "rustls", "url": "https://github.com/rustls/rustls" }
+    ],
+
+    "features": [
+      {
+        "id": "kernel",
+        "num": "01",
+        "cards": ["boot-cpu", "memory", "scheduler", "syscall", "storage", "networking", "input"]
+      },
+      {
+        "id": "desktop",
+        "num": "02",
+        "cards": ["compositor", "design-system", "window-management", "panel-launcher", "file-manager", "clipboard", "wallpaper"]
+      },
+      {
+        "id": "shell",
+        "num": "03",
+        "cards": ["virtual-terminal", "readline-shell", "command-catalog", "error-ux"]
+      },
+      {
+        "id": "apps",
+        "num": "04",
+        "cards": ["signed-packages", "text-editor", "installer", "ui-toolkit"]
+      }
+    ],
+
+    "domains": [
+      { "id": "boot", "folder": "boot/" },
+      { "id": "mem", "folder": "mem/" },
+      { "id": "bus", "folder": "bus/" },
+      { "id": "fs", "folder": "fs/" },
+      { "id": "net", "folder": "net/" },
+      { "id": "input", "folder": "input/" },
+      { "id": "ui", "folder": "ui/" },
+      { "id": "task", "folder": "task/" }
+    ],
+
+    "apps": [
+      { "id": "sh", "code": "sh" },
+      { "id": "edit", "code": "edit" },
+      { "id": "widgets", "code": "widgets" },
+      { "id": "install", "code": "install" },
+      { "id": "winprobe", "code": "winprobe" },
+      { "id": "clock", "code": "clock" },
+      { "id": "file-utils", "code": "ls · cat · echo" },
+      { "id": "verify", "code": "hello · fault · spin" }
+    ],
+
+    "libs": [
+      { "id": "libcoeleo", "code": "libcoeleo" },
+      { "id": "libcoeleoui", "code": "libcoeleoui" },
+      { "id": "coeleo-theme", "code": "coeleo-theme" },
+      { "id": "coeleo-draw", "code": "coeleo-draw" },
+      { "id": "coeleo-image", "code": "coeleo-image" },
+      { "id": "pkg", "code": "pkg" }
+    ],
+
+    "roadmap": [
+      { "id": "next", "pill": "now", "phases": ["27", "28"] },
+      { "id": "soon", "pill": "soon", "phases": ["29", "30", "31", "32", "33"] },
+      { "id": "later", "pill": "later", "phases": ["34", "35", "36"] },
+      { "id": "far", "pill": "far", "phases": ["37", "38", "39", "40"] },
+      { "id": "vision", "pill": "vision", "phases": ["41", "42", "43", "44", "45", "46", "47", "48", "49"] }
+    ],
+
+    "docs": [
+      { "id": "contribIndex", "url": "https://github.com/coeleo-dev/coeleo-os/blob/main/docs/contrib/README.md" },
+      { "id": "agents", "url": "https://github.com/coeleo-dev/coeleo-os/blob/main/AGENTS.md" },
+      { "id": "architecture", "url": "https://github.com/coeleo-dev/coeleo-os/blob/main/docs/contrib/architecture.md" },
+      { "id": "develop", "url": "https://github.com/coeleo-dev/coeleo-os/blob/main/docs/contrib/develop.md" },
+      { "id": "troubleshooting", "url": "https://github.com/coeleo-dev/coeleo-os/blob/main/docs/contrib/troubleshooting.md" }
+    ],
+
+    "shots": [
+      { "id": "desktop", "file": "screenshot-01.webp", "w": 1278, "h": 799 },
+      { "id": "terminal", "file": "screenshot-02.webp", "w": 1281, "h": 800 },
+      { "id": "file-manager", "file": "screenshot-03.webp", "w": 1281, "h": 801 },
+      { "id": "shell", "file": "screenshot-04.webp", "w": 1282, "h": 800 },
+      { "id": "launcher", "file": "screenshot-05.webp", "w": 1281, "h": 802 },
+      { "id": "widgets", "file": "screenshot-06.webp", "w": 1281, "h": 801 },
+      { "id": "windows", "file": "screenshot-07.webp", "w": 1280, "h": 801 }
+    ],
+
+    "build": {
+      "prereq": "sudo apt install make build-essential xorriso \\\n  qemu-system-x86 python3 mtools gdisk",
+      "otherTargets": [
+        { "id": "run-ahci", "cmd": "make run-ahci" },
+        { "id": "run-e1000e", "cmd": "make run-e1000e" },
+        { "id": "run-usb", "cmd": "make run-usb" },
+        { "id": "run-bios", "cmd": "make run-bios" },
+        { "id": "run-hdd", "cmd": "make run-hdd" }
+      ],
+      "tests": [
+        "make test-phase8 test-phase9 test-phase10 test-phase13 test-phase14",
+        "make test-plasma-p2 test-plasma-p3 test-plasma-p4 test-plasma-p5 test-plasma-p6 test-plasma-p7",
+        "make test-phase22"
+      ]
+    },
+
+    "labels": {
+      "licenseMit": "MIT License",
+      "licenseApache": "Apache License 2.0"
+    }
+  },
+
+  "i18n": {
+    "en": {
+      "meta": {
+        "title": "Coeleo OS — a from-scratch x86_64 operating system in Rust",
+        "description": "Coeleo OS is a from-scratch x86_64 operating system written in Rust: its own kernel, syscall ABI, software compositor, shell and userspace. The kernel, the desktop and the userspace are code in one repository. MIT OR Apache-2.0.",
+        "ogDescription": "Its own kernel, syscall ABI, software compositor, shell and userspace. Built in one repository, from boot to desktop.",
+        "ogImageAlt": "Coeleo OS — a from-scratch x86_64 operating system in Rust, showing the dark Slate desktop."
+      },
+
+      "nav": {
+        "skip": "Skip to content",
+        "sectionsLabel": "Sections",
+        "toggleLabel": "Toggle navigation",
+        "labels": {
+          "features": "Features",
+          "screenshots": "Screenshots",
+          "architecture": "Architecture",
+          "build": "Build",
+          "roadmap": "Roadmap",
+          "docs": "Docs",
+          "faq": "FAQ"
+        },
+        "github": "GitHub",
+        "languageLabel": "Language",
+        "switchTo": "Mudar para Português"
+      },
+
+      "lightbox": {
+        "close": "Close",
+        "previous": "Previous image",
+        "next": "Next image"
+      },
+
+      "hero": {
+        "title": "Coeleo OS",
+        "tagline": "A from-scratch x86_64 operating system, written in Rust.",
+        "lead": "Not Linux, not Windows, not Redox, not an RTOS. The kernel, the syscall ABI, the design system and the userspace are built in this repository — from boot to desktop.",
+        "badges": ["MIT OR Apache-2.0", "Rust nightly", "x86_64"],
+        "actions": {
+          "github": "View on GitHub",
+          "build": "Build &amp; run",
+          "docs": "Read the docs"
+        },
+        "stats": [
+          { "label": "Syscalls", "value": "27" },
+          { "label": "Process slots", "value": "8" },
+          { "label": "Paging", "value": "4-level" },
+          { "label": "Cores used", "value": "1" }
+        ],
+        "heroShotAlt": "Coeleo OS desktop running in QEMU: the dark Slate theme, a floating window painted by the software compositor and the taskbar panel with its live clock."
+      },
+
+      "reuse": {
+        "title": "Assembled from focused components — not a whole OS",
+        "lead": "Coeleo OS selectively reuses <strong>focused components</strong> rather than embedding a whole operating system. Everything else is code you can read here.",
+        "note": "The rest — physical and virtual memory, the heap, the preemptive scheduler, the syscall ABI, the software compositor, the design system, the shell, the UI toolkit, the file manager, the installer and the package manager — is implemented in this repository.",
+        "items": {
+          "limine": "Bootloader (UEFI and BIOS)",
+          "flanterm": "Terminal emulation",
+          "smoltcp": "TCP/IP stack",
+          "fatfs": "FAT32 filesystem",
+          "rustls": "TLS 1.2 / 1.3"
+        }
+      },
+
+      "features": {
+        "title": "What is implemented",
+        "lead": "Boot to a desktop and a working prompt: its own memory, scheduler, syscall ABI, filesystem, drivers and compositor, with a userspace on top. One core, a software framebuffer and at most eight processes at once.",
+        "groups": {
+          "kernel": {
+            "title": "Kernel and hardware",
+            "cards": {
+              "boot-cpu": {
+                "title": "Boot and CPU foundation",
+                "body": "Limine on UEFI and legacy BIOS, GDT, IDT, LAPIC timer and interrupt routing, ACPI and a civil RTC clock. Context switching lives in naked assembly in one file."
+              },
+              "memory": {
+                "title": "Memory management",
+                "body": "A physical frame bitmap (PMM), 4-level paging (VMM) with strict user/kernel address-space isolation, and a kernel heap allocator."
+              },
+              "scheduler": {
+                "title": "Preemptive scheduler",
+                "body": "Round-robin driven by LAPIC timer interrupts, with a PCB table capped at 8 concurrent processes, zombie reaping and clean resource teardown."
+              },
+              "syscall": {
+                "title": "Syscall layer",
+                "body": "27 syscalls reached through <code>libcoeleo</code>, covering processes, files, pipes, the network, time, window surfaces, system info and the clipboard."
+              },
+              "storage": {
+                "title": "FAT32 and storage",
+                "body": "FAT32 with cluster allocation, long filenames, traversal, read, write, truncate and sync. Disk backends: VirtIO-blk, SATA AHCI with GPT partitions, and USB Mass Storage."
+              },
+              "networking": {
+                "title": "Networking",
+                "body": "<code>smoltcp</code> over virtio-net or Intel e1000e — one PHY, picked at boot. Static IPv4 or DHCP, ARP, ICMP echo, DNS A records, an HTTP client and TLS 1.2/1.3."
+              },
+              "input": {
+                "title": "Input drivers",
+                "body": "PS/2 keyboard with full scancode translation and key event dispatch; PS/2 and USB HID mice over UHCI and xHCI controllers."
+              }
+            }
+          },
+          "desktop": {
+            "title": "Desktop",
+            "cards": {
+              "compositor": {
+                "title": "Software 2D compositor",
+                "body": "Pure CPU linear-framebuffer rendering with dirty-rect clipping and selective damage updates, so only what changed is repainted. No hardware acceleration."
+              },
+              "design-system": {
+                "title": "One shared design system",
+                "body": "Kernel chrome and Ring&nbsp;3 applications paint from the same palette and metrics (<code>coeleo-theme</code>), with SDF hairline borders, anti-aliased corners and layered shadows."
+              },
+              "window-management": {
+                "title": "Window management",
+                "body": "Floating windows with dragging, 8-direction edge resize, minimise / maximise / close controls, title elision and a glowing accent border on the focused window."
+              },
+              "panel-launcher": {
+                "title": "Panel and launcher",
+                "body": "A floating pill or full-width panel with a live clock and network indicator, plus KRunner (Alt+Space) — a modal overlay with fuzzy search and keyboard navigation."
+              },
+              "file-manager": {
+                "title": "Graphical file manager",
+                "body": "An embedded dual-pane explorer with breadcrumb pills, a Places and Devices sidebar, per-file icons and keyboard navigation."
+              },
+              "clipboard": {
+                "title": "Clipboard and notifications",
+                "body": "A kernel-level global clipboard behind <code>SYS_CLIPBOARD</code>, shared by the terminal, the shell and GUI apps. Floating rounded toasts report background work, copies and alerts."
+              },
+              "wallpaper": {
+                "title": "Wallpaper and settings",
+                "body": "Full-screen desktop with solid colours or decoded JPEG/PNG wallpapers, with preferences persisted to the disk across reboots."
+              }
+            }
+          },
+          "shell": {
+            "title": "Shell and terminal",
+            "cards": {
+              "virtual-terminal": {
+                "title": "Virtual terminal",
+                "body": "A Flanterm terminal embedded in the window, with a 16-colour ANSI palette harmonised with the Slate theme, cursor positioning, bold text and clean blits."
+              },
+              "readline-shell": {
+                "title": "Readline-class shell",
+                "body": "Line editing with Home/End, word jumps, kill and transpose; a 128-entry history ring, <kbd>Ctrl</kbd>+<kbd>R</kbd> reverse search, Tab completion, aliases, semicolons, pipes and redirects."
+              },
+              "command-catalog": {
+                "title": "Command catalog",
+                "body": "52 builtins across files and directories, text processing (<code>grep</code>, <code>wc</code>, <code>head</code>, <code>tail</code>), processes and memory, storage inspection, packages, networking and power."
+              },
+              "error-ux": {
+                "title": "Errors that help",
+                "body": "Semantically styled <code>error:</code>, <code>warning:</code>, <code>tip:</code> and <code>usage:</code> prefixes, target-specific descriptions, and a Levenshtein suggestion engine that asks “did you mean…?”."
+              }
+            }
+          },
+          "apps": {
+            "title": "Applications and packages",
+            "cards": {
+              "signed-packages": {
+                "title": "Signed packages",
+                "body": "Ed25519 signatures and SHA-256 integrity verification for <code>.coe</code> payloads, fetched over plaintext HTTP or TLS and installed from disk or the network."
+              },
+              "text-editor": {
+                "title": "Text editor",
+                "body": "<code>edit</code>, a TUI editor on the virtual terminal, with save and quit shortcuts."
+              },
+              "installer": {
+                "title": "OS installer",
+                "body": "A graphical and CLI installer that deploys the system onto a GPT-partitioned AHCI or USB disk."
+              },
+              "ui-toolkit": {
+                "title": "Immediate-mode UI toolkit",
+                "body": "<code>libcoeleoui</code> gives Ring&nbsp;3 apps the same widget language as the desktop; the <code>widgets</code> binary is a live demo of it."
+              }
+            }
+          }
+        }
+      },
+
+      "screenshots": {
+        "title": "Screenshots",
+        "lead": "Captured from Coeleo OS running under QEMU. Select an image to enlarge.",
+        "enlarge": "Enlarge screenshot",
+        "shots": {
+          "desktop": "The Coeleo OS desktop running in QEMU: the dark Slate theme, window chrome drawn by the software compositor and the taskbar panel.",
+          "terminal": "A Coeleo OS window on the virtual terminal, with the shell running on the bare-metal x86_64 kernel under QEMU.",
+          "file-manager": "A window on the Coeleo OS desktop in QEMU, painted with the compositor's Slate-themed window chrome.",
+          "shell": "A Coeleo OS shell session inside its window on the virtual terminal, running under QEMU.",
+          "launcher": "A Coeleo OS desktop state in QEMU, with an overlay window above the Slate-themed background.",
+          "widgets": "A Ring 3 application window on the Coeleo OS desktop, painted with the shared coeleo-theme design tokens.",
+          "windows": "Floating windows on the Coeleo OS desktop, each repainted by the software compositor as damage is reported."
+        }
+      },
+
+      "architecture": {
+        "title": "Architecture",
+        "lead": "One kernel crate, folders by domain. Programmes are static Ring&nbsp;3 ELFs on top, and a syscall ABI is the only thing that crosses the line.",
+        "caption": "Kernel domain map",
+        "headers": { "domain": "Domain", "folder": "Folder", "responsibility": "Responsibility" },
+        "domains": {
+          "boot": { "name": "Boot / CPU", "role": "GDT, IDT, LAPIC, console, ACPI, RTC" },
+          "mem": { "name": "Memory", "role": "PMM, VMM, kernel heap" },
+          "bus": { "name": "PCI / USB host", "role": "PCI config space, xHCI" },
+          "fs": { "name": "Disk / FAT", "role": "FAT32, block layer, GPT, AHCI, USB MSC, installer" },
+          "net": { "name": "Network", "role": "smoltcp, HTTP, TLS, DHCP, DNS A, virtio-net or e1000e" },
+          "input": { "name": "Input", "role": "PS/2 keyboard and mouse, UHCI, xHCI HID" },
+          "ui": { "name": "Desktop", "role": "Compositor, panel, KRunner, file manager, VT, windows" },
+          "task": { "name": "Processes", "role": "Preemptive scheduler, syscalls, FDs, pipes, ELF loader" }
+        },
+        "diagram": {
+          "ringLeft": "Ring 3 - userspace",
+          "ringRight": "Ring 0 - kernel",
+          "leftLines": ["static no_std ELFs", "entry at _start", "no libc, no dynamic linking"],
+          "rightLines": ["one crate", "folders by domain, not crates", "no userspace code linked in"],
+          "middle": "syscalls (27)",
+          "bottomLines": ["libcoeleo wrappers", "the only crossing between rings"]
+        }
+      },
+
+      "apps": {
+        "title": "Userspace and libraries",
+        "lead": "Programs are static <code>no_std</code> ELFs (<code>x86_64-unknown-none</code>) that enter at <code>_start</code> and talk to the kernel through <code>libcoeleo</code>.",
+        "appsCaption": "Bundled applications",
+        "appsHeaders": { "name": "Application", "role": "Role" },
+        "roles": {
+          "sh": "Interactive shell: line editing, completion, dynamic prompt, aliases, builtins",
+          "edit": "TUI text editor on the virtual terminal",
+          "widgets": "GUI demo of the immediate-mode <code>libcoeleoui</code> toolkit",
+          "install": "Graphical and CLI installer for GPT / AHCI disks",
+          "winprobe": "Ring&nbsp;3 surface creation and animation benchmark",
+          "clock": "Background graphical clock process",
+          "file-utils": "Standalone command-line file utilities",
+          "verify": "Spawn, fault-handling and CPU-loop verification binaries"
+        },
+        "libsCaption": "Shared no_std libraries",
+        "libsHeaders": { "crate": "Crate", "role": "Role" },
+        "libRoles": {
+          "libcoeleo": "Syscall wrappers with an allocation-free, safe API",
+          "libcoeleoui": "Immediate-mode UI widget toolkit",
+          "coeleo-theme": "Design tokens: palette and layout metrics",
+          "coeleo-draw": "2D primitives: SDF round strokes, text and icons",
+          "coeleo-image": "JPEG and PNG decoding for wallpapers",
+          "pkg": "Ed25519 verification and <code>.coe</code> package handling"
+        }
+      },
+
+      "build": {
+        "title": "Build and run",
+        "lead": "Requires a Linux host with QEMU. Rust nightly is pinned by the toolchain file.",
+        "prereqTitle": "Prerequisites (Ubuntu / Debian)",
+        "buildTitle": "Build, then boot",
+        "blockComments": {
+          "all": "Kernel ISO, userspace ELFs and test packages",
+          "run": "UEFI boot: virtio-blk, virtio-net, USB mouse"
+        },
+        "otherTargetsSummary": "Other run targets",
+        "otherTargetComments": {
+          "run-ahci": "SATA/AHCI boot disk with a GPT partition",
+          "run-e1000e": "Intel e1000e NIC instead of virtio-net",
+          "run-usb": "xHCI with USB Mass Storage",
+          "run-bios": "boot the ISO through legacy BIOS instead of UEFI",
+          "run-hdd": "boot from a GPT hard-disk image (UEFI)"
+        },
+        "testsSummary": "Automated tests",
+        "testsLead": "Integration suites run QEMU headless and assert against the serial log — including TLS and package-signature verification."
+      },
+
+      "roadmap": {
+        "title": "Roadmap",
+        "lead": "Work here is phase-gated: one written spec, then the code, then that phase's gate. The order below is what unblocks a person at a real machine, not what is easiest to demo.",
+        "today": "<strong>Shipping today</strong> — from boot to a desktop: its own physical and virtual memory, preemptive scheduler, syscall ABI, compositor, shell, editor, installer, package manager and TLS. On one core, with at most eight processes at once, on FAT32.",
+        "pills": {
+          "now": "Next",
+          "soon": "Then",
+          "later": "Later",
+          "far": "Long term",
+          "vision": "Vision"
+        },
+        "bands": {
+          "next": {
+            "title": "Leave the PS/2 desk",
+            "desc": "Drivers that stop the machine depending on a 1990s port and a legacy disk controller.",
+            "phases": {
+              "27": { "title": "NVMe", "body": "The typical internal SSD is not AHCI. This brings the same FAT tree up on a modern drive." },
+              "28": { "title": "USB-Ethernet", "body": "Wired networking with no PCI NIC, so a machine with a dongle is not offline." }
+            }
+          },
+          "soon": {
+            "title": "Session depth",
+            "desc": "What turns a working prompt into a session you can rely on.",
+            "phases": {
+              "29": { "title": "Anonymous <code>mmap</code> and copy IPC", "body": "Memory is reached through the library's allocation API today. A general mapping interface is what unlocks the rest of this band." },
+              "30": { "title": "Userspace sockets", "body": "The TCP/IP stack lives in the kernel today. Sockets expose TCP to Ring&nbsp;3 without moving where the stack runs." },
+              "31": { "title": "HTML subset viewer", "body": "Render real documents on the OS itself, starting from a defined subset of HTML and CSS." },
+              "32": { "title": "User model", "body": "Multi-user sessions and privilege levels, built as a Coeleo-native capability. There are no users or privileges to elevate today." },
+              "33": { "title": "NTP", "body": "Set the clock from the network instead of trusting the RTC alone." }
+            }
+          },
+          "later": {
+            "title": "CPU, measured first",
+            "desc": "One core and a 100&nbsp;Hz tick already cover the target envelope, so these wait for a measurement that asks for them.",
+            "phases": {
+              "34": { "title": "Tickless LAPIC", "body": "Stop paying for a periodic interrupt when nothing is runnable." },
+              "35": { "title": "Symmetric multiprocessing", "body": "Put every core to work, which means rewriting memory and heap locking end to end." },
+              "36": { "title": "Threads inside a process", "body": "One thread per process today. Threads need a new PCB, stack and address-space story first." }
+            }
+          },
+          "far": {
+            "title": "Radio, media, laptop",
+            "desc": "Each of these is a project of its own, and each waits on the band above it.",
+            "phases": {
+              "37": { "title": "Wi-Fi", "body": "Firmware blobs and 802.11 are where small systems stall, so this lands once wired networking is solid." },
+              "38": { "title": "Audio", "body": "No sound device is driven today." },
+              "39": { "title": "Suspend", "body": "S3 sleep states, built on the ACPI work already landed." },
+              "40": { "title": "Battery and lid", "body": "Power reporting and lid events for laptop use." }
+            }
+          },
+          "vision": {
+            "title": "Beyond the reference machine",
+            "desc": "The far horizon: the subsystems that turn a working desktop into a general-purpose platform.",
+            "phases": {
+              "41": { "title": "Compositor and network in Ring&nbsp;3", "body": "Move both out of the kernel, behind inter-process communication." },
+              "42": { "title": "Declarative UI toolkit", "body": "A higher-level toolkit for building applications, alongside the immediate-mode one." },
+              "43": { "title": "Tiling window management", "body": "A keyboard-driven tiling layout offered next to the floating desktop." },
+              "44": { "title": "EXT4 read and write", "body": "A second filesystem, lifting the FAT32 per-file ceiling and adding crash safety." },
+              "45": { "title": "POSIX ABI, relibc and shared objects", "body": "Dynamic linking and a familiar ABI so software ported from elsewhere can load." },
+              "46": { "title": "IPv6", "body": "Next-generation addressing alongside the IPv4 stack." },
+              "47": { "title": "3D GPU acceleration", "body": "Hardware-accelerated rendering and compute beyond the software framebuffer." },
+              "48": { "title": "5-level paging and IOMMU", "body": "A wider address space, plus DMA isolation for device drivers." },
+              "49": { "title": "HTML and CSS engine", "body": "Extend the same engine toward full document layout and richer web content." }
+            }
+          }
+        }
+      },
+
+      "docs": {
+        "title": "Documentation",
+        "items": {
+          "contribIndex": { "label": "Contributor index", "note": "Start here" },
+          "agents": { "label": "How to write code here", "note": "Standards and contributing contracts" },
+          "architecture": { "label": "Architecture", "note": "Technical map of the code" },
+          "develop": { "label": "Develop", "note": "Build, test and debug workflows" },
+          "troubleshooting": { "label": "Troubleshooting", "note": "Host-side failures and how to recover" }
+        }
+      },
+
+      "faq": {
+        "title": "Frequently asked questions",
+        "lead": "Short, factual answers about what Coeleo OS is, what it runs on and what it deliberately is not.",
+        "items": [
+          {
+            "id": "what-is",
+            "q": "What is Coeleo OS?",
+            "a": "Coeleo OS is a from-scratch x86_64 operating system written in Rust. It has its own kernel, syscall ABI, software compositor, shell and userspace, all built in a single repository. It is not a Linux distribution and does not use the Linux kernel."
+          },
+          {
+            "id": "linux",
+            "q": "Is Coeleo OS a Linux distribution?",
+            "a": "No. Coeleo OS does not use the Linux kernel and ships no Linux userspace. It reuses a few focused third-party components — Limine for boot, Flanterm for terminal emulation, smoltcp for TCP/IP, fatfs for FAT32 and rustls for TLS — and implements the rest itself."
+          },
+          {
+            "id": "hardware",
+            "q": "Does Coeleo OS run on real hardware?",
+            "a": "It boots on UEFI and legacy BIOS machines, and the documented development path is QEMU with virtio-blk, virtio-net and USB input. It targets a single core, roughly 512 MiB of RAM and a software linear framebuffer with no 3D GPU."
+          },
+          {
+            "id": "build",
+            "q": "How do I build and run Coeleo OS?",
+            "a": "On a Linux host with QEMU installed, run \"make all\" to build the kernel ISO and the userspace ELFs, then \"make run\" to boot it under UEFI with virtio-blk, virtio-net and a USB mouse. Targets such as make run-ahci, make run-e1000e, make run-usb and make run-bios cover other disk, network and firmware configurations."
+          },
+          {
+            "id": "redox",
+            "q": "How is Coeleo OS different from Redox OS?",
+            "a": "Redox OS is a Unix-like microkernel system with Linux and BSD source compatibility, POSIX support and a ported compiler toolchain. Coeleo OS is smaller in scope and deliberately not Unix-compatible: the kernel is one crate, there is no libc, no dynamic linking and no POSIX ABI, and programs are static no_std ELFs that enter at _start and talk to the kernel through 27 syscalls. A POSIX ABI, relibc and shared objects are on the long-term roadmap, not implemented today."
+          },
+          {
+            "id": "license",
+            "q": "What license is Coeleo OS under?",
+            "a": "Coeleo OS is distributed under the terms of either the MIT License or the Apache License 2.0, at your option (MIT OR Apache-2.0). Third-party components such as Limine, Flanterm, smoltcp, fatfs and rustls keep their own licenses."
+          },
+          {
+            "id": "cores",
+            "q": "Does Coeleo OS support multiple CPU cores?",
+            "a": "Not yet. The scheduler runs on one core with a 100 Hz LAPIC tick and a process table capped at eight concurrent processes. Symmetric multiprocessing and threads inside a process are on the roadmap but are not implemented."
+          }
+        ]
+      },
+
+      "footer": {
+        "licenseHtml": "Distributed under the terms of either the <a href=\"https://github.com/coeleo-dev/coeleo-os/blob/main/LICENSE-MIT\" target=\"_blank\" rel=\"noopener\">MIT License</a> or the <a href=\"https://github.com/coeleo-dev/coeleo-os/blob/main/LICENSE-APACHE\" target=\"_blank\" rel=\"noopener\">Apache License 2.0</a>, at your option.",
+        "note": "Third-party components (Limine, Flanterm, <code>smoltcp</code>, <code>fatfs</code>, <code>rustls</code> and the boot firmware the build links) keep their own licenses.",
+        "repository": "Repository",
+        "issues": "Issues"
+      },
+
+      "llms": {
+        "summary": "Coeleo OS is a from-scratch x86_64 operating system written in Rust: its own kernel, syscall ABI, software compositor, shell and userspace, built in a single repository. It is not a Linux distribution and does not use the Linux kernel.",
+        "sections": [
+          {
+            "title": "Overview",
+            "lines": [
+              "Target: x86_64, single core, ~512 MiB RAM, software linear framebuffer, no 3D GPU.",
+              "Boot: Limine, on UEFI and legacy BIOS.",
+              "Kernel: one Rust crate, folders by domain, no userspace code linked in.",
+              "Userspace: static no_std ELFs (x86_64-unknown-none) that enter at _start.",
+              "Syscall ABI: 27 syscalls, reached through the libcoeleo wrappers - the only crossing between rings.",
+              "Process model: preemptive round-robin on a 100 Hz LAPIC tick, at most 8 concurrent processes, one thread per process.",
+              "Memory: physical frame bitmap, 4-level paging with strict user/kernel isolation, kernel heap allocator.",
+              "Storage: FAT32 with cluster allocation and long filenames, over VirtIO-blk, SATA AHCI (GPT) or USB Mass Storage.",
+              "Network: smoltcp over virtio-net or Intel e1000e, static IPv4 or DHCP, ARP, ICMP echo, DNS A, HTTP client, TLS 1.2/1.3 via rustls.",
+              "Packages: .coe payloads with Ed25519 signatures and SHA-256 integrity verification.",
+              "License: MIT OR Apache-2.0."
+            ]
+          },
+          {
+            "title": "What it is not",
+            "lines": [
+              "Not a Linux distribution and not Unix-compatible: no libc, no dynamic linking, no POSIX ABI.",
+              "Not derived from Redox, Windows, or an RTOS.",
+              "No SMP, no threads, no Wi-Fi, no audio, no suspend, no 3D acceleration today."
+            ]
+          },
+          {
+            "title": "Build and run",
+            "lines": [
+              "Host: Linux with QEMU, make, xorriso, python3, mtools and gdisk.",
+              "make all - kernel ISO plus userspace ELFs and test packages.",
+              "make run - UEFI boot with virtio-blk, virtio-net and a USB mouse.",
+              "Other targets: make run-ahci, run-e1000e, run-usb, run-bios, run-hdd.",
+              "Tests run QEMU headless and assert against the serial log."
+            ]
+          },
+          {
+            "title": "Reused components",
+            "lines": [
+              "Limine - bootloader (UEFI and BIOS).",
+              "Flanterm - terminal emulation.",
+              "smoltcp - TCP/IP stack.",
+              "fatfs - FAT32 filesystem.",
+              "rustls - TLS 1.2/1.3.",
+              "Everything else (memory, scheduler, compositor, syscalls, shell, UI toolkit, installer, package manager) is implemented in the repository."
+            ]
+          }
+        ]
+      }
+    },
+
+    "pt-BR": {
+      "meta": {
+        "title": "Coeleo OS — um sistema operacional x86_64 feito do zero em Rust",
+        "description": "Coeleo OS é um sistema operacional x86_64 escrito do zero em Rust: kernel próprio, ABI de syscalls, compositor em software, shell e userspace. Kernel, desktop e userspace são código em um único repositório. MIT OR Apache-2.0.",
+        "ogDescription": "Kernel próprio, ABI de syscalls, compositor em software, shell e userspace. Tudo construído em um repositório, do boot ao desktop.",
+        "ogImageAlt": "Coeleo OS — um sistema operacional x86_64 feito do zero em Rust, mostrando o desktop escuro do tema Slate."
+      },
+
+      "nav": {
+        "skip": "Ir para o conteúdo",
+        "sectionsLabel": "Seções",
+        "toggleLabel": "Alternar navegação",
+        "labels": {
+          "features": "Recursos",
+          "screenshots": "Capturas",
+          "architecture": "Arquitetura",
+          "build": "Compilar",
+          "roadmap": "Roadmap",
+          "docs": "Documentação",
+          "faq": "Perguntas frequentes"
+        },
+        "github": "GitHub",
+        "languageLabel": "Idioma",
+        "switchTo": "Switch to English"
+      },
+
+      "lightbox": {
+        "close": "Fechar",
+        "previous": "Imagem anterior",
+        "next": "Próxima imagem"
+      },
+
+      "hero": {
+        "title": "Coeleo OS",
+        "tagline": "Um sistema operacional x86_64 escrito do zero, em Rust.",
+        "lead": "Não é Linux, não é Windows, não é Redox e não é um RTOS. O kernel, a ABI de syscalls, o design system e o userspace são construídos neste repositório — do boot ao desktop.",
+        "badges": ["MIT OR Apache-2.0", "Rust nightly", "x86_64"],
+        "actions": {
+          "github": "Ver no GitHub",
+          "build": "Compilar e executar",
+          "docs": "Ler a documentação"
+        },
+        "stats": [
+          { "label": "Syscalls", "value": "27" },
+          { "label": "Processos", "value": "8" },
+          { "label": "Paginação", "value": "4 níveis" },
+          { "label": "Núcleos usados", "value": "1" }
+        ],
+        "heroShotAlt": "Desktop do Coeleo OS rodando no QEMU: o tema escuro Slate, uma janela flutuante pintada pelo compositor em software e o painel com relógio ao vivo."
+      },
+
+      "reuse": {
+        "title": "Montado a partir de componentes focados — não de um sistema inteiro",
+        "lead": "O Coeleo OS reutiliza seletivamente <strong>componentes focados</strong> em vez de embutir um sistema operacional inteiro. Todo o resto é código que você pode ler aqui.",
+        "note": "O restante — memória física e virtual, heap, escalonador preemptivo, ABI de syscalls, compositor em software, design system, shell, toolkit de UI, gerenciador de arquivos, instalador e gerenciador de pacotes — é implementado neste repositório.",
+        "items": {
+          "limine": "Bootloader (UEFI e BIOS)",
+          "flanterm": "Emulação de terminal",
+          "smoltcp": "Pilha TCP/IP",
+          "fatfs": "Sistema de arquivos FAT32",
+          "rustls": "TLS 1.2 / 1.3"
+        }
+      },
+
+      "features": {
+        "title": "O que está implementado",
+        "lead": "Do boot até um desktop e um prompt funcional: memória, escalonador, ABI de syscalls, sistema de arquivos, drivers e compositor próprios, com o userspace por cima. Um núcleo, framebuffer em software e no máximo oito processos ao mesmo tempo.",
+        "groups": {
+          "kernel": {
+            "title": "Kernel e hardware",
+            "cards": {
+              "boot-cpu": {
+                "title": "Boot e base da CPU",
+                "body": "Limine em UEFI e BIOS legado, GDT, IDT, timer LAPIC e roteamento de interrupções, ACPI e relógio RTC. A troca de contexto vive em assembly nude em um único arquivo."
+              },
+              "memory": {
+                "title": "Gerenciamento de memória",
+                "body": "Bitmap de frames físicos (PMM), paginação de 4 níveis (VMM) com isolamento estrito entre espaço de usuário e de kernel, e um alocador de heap do kernel."
+              },
+              "scheduler": {
+                "title": "Escalonador preemptivo",
+                "body": "Round-robin movido por interrupções do timer LAPIC, com uma tabela de PCBs limitada a 8 processos simultâneos, coleta de zumbis e destruição limpa de recursos."
+              },
+              "syscall": {
+                "title": "Camada de syscalls",
+                "body": "27 syscalls acessadas por meio da <code>libcoeleo</code>, cobrindo processos, arquivos, pipes, rede, tempo, superfícies de janela, informações do sistema e a área de transferência."
+              },
+              "storage": {
+                "title": "FAT32 e armazenamento",
+                "body": "FAT32 com alocação de clusters, nomes longos, travessia, leitura, escrita, truncate e sync. Backends de disco: VirtIO-blk, SATA AHCI com partições GPT e USB Mass Storage."
+              },
+              "networking": {
+                "title": "Rede",
+                "body": "<code>smoltcp</code> sobre virtio-net ou Intel e1000e — um PHY, escolhido no boot. IPv4 estático ou DHCP, ARP, ICMP echo, registros DNS A, cliente HTTP e TLS 1.2/1.3."
+              },
+              "input": {
+                "title": "Drivers de entrada",
+                "body": "Teclado PS/2 com tradução completa de scancodes e despacho de eventos de tecla; mouses PS/2 e USB HID sobre controladores UHCI e xHCI."
+              }
+            }
+          },
+          "desktop": {
+            "title": "Desktop",
+            "cards": {
+              "compositor": {
+                "title": "Compositor 2D em software",
+                "body": "Renderização puramente em CPU sobre framebuffer linear, com recorte por dirty-rect e atualizações seletivas de dano, repintando apenas o que mudou. Sem aceleração de hardware."
+              },
+              "design-system": {
+                "title": "Um design system compartilhado",
+                "body": "O chrome do kernel e os aplicativos em Ring&nbsp;3 pintam a partir da mesma paleta e das mesmas métricas (<code>coeleo-theme</code>), com bordas hairline via SDF, cantos com anti-aliasing e sombras em camadas."
+              },
+              "window-management": {
+                "title": "Gerenciamento de janelas",
+                "body": "Janelas flutuantes com arraste, redimensionamento por 8 direções, controles de minimizar / maximizar / fechar, elisão de título e borda de destaque brilhante na janela em foco."
+              },
+              "panel-launcher": {
+                "title": "Painel e lançador",
+                "body": "Um painel flutuante em pílula ou de largura total, com relógio ao vivo e indicador de rede, além do KRunner (Alt+Space) — um overlay modal com busca fuzzy e navegação por teclado."
+              },
+              "file-manager": {
+                "title": "Gerenciador de arquivos gráfico",
+                "body": "Um explorer embutido de dois painéis, com pílulas de breadcrumb, barra lateral de Locais e Dispositivos, ícones por arquivo e navegação por teclado."
+              },
+              "clipboard": {
+                "title": "Área de transferência e notificações",
+                "body": "Uma área de transferência global em nível de kernel por trás da <code>SYS_CLIPBOARD</code>, compartilhada pelo terminal, pelo shell e pelos apps gráficos. Toasts arredondados flutuantes informam trabalho em segundo plano, cópias e alertas."
+              },
+              "wallpaper": {
+                "title": "Papel de parede e configurações",
+                "body": "Desktop em tela cheia com cores sólidas ou papéis de parede JPEG/PNG decodificados, com preferências persistidas em disco entre reinicializações."
+              }
+            }
+          },
+          "shell": {
+            "title": "Shell e terminal",
+            "cards": {
+              "virtual-terminal": {
+                "title": "Terminal virtual",
+                "body": "Um terminal Flanterm embutido na janela, com paleta ANSI de 16 cores harmonizada com o tema Slate, posicionamento de cursor, texto em negrito e blits limpos."
+              },
+              "readline-shell": {
+                "title": "Shell de nível readline",
+                "body": "Edição de linha com Home/End, saltos por palavra, kill e transpose; um anel de histórico de 128 entradas, busca reversa com <kbd>Ctrl</kbd>+<kbd>R</kbd>, completação por Tab, aliases, ponto e vírgula, pipes e redirecionamentos."
+              },
+              "command-catalog": {
+                "title": "Catálogo de comandos",
+                "body": "52 builtins cobrindo arquivos e diretórios, processamento de texto (<code>grep</code>, <code>wc</code>, <code>head</code>, <code>tail</code>), processos e memória, inspeção de armazenamento, pacotes, rede e energia."
+              },
+              "error-ux": {
+                "title": "Erros que ajudam",
+                "body": "Prefixos semanticamente estilizados <code>error:</code>, <code>warning:</code>, <code>tip:</code> e <code>usage:</code>, descrições específicas por alvo e um motor de sugestão por Levenshtein que pergunta “você quis dizer…?”."
+              }
+            }
+          },
+          "apps": {
+            "title": "Aplicativos e pacotes",
+            "cards": {
+              "signed-packages": {
+                "title": "Pacotes assinados",
+                "body": "Assinaturas Ed25519 e verificação de integridade SHA-256 para payloads <code>.coe</code>, obtidos por HTTP em texto claro ou TLS e instalados do disco ou da rede."
+              },
+              "text-editor": {
+                "title": "Editor de texto",
+                "body": "<code>edit</code>, um editor TUI sobre o terminal virtual, com atalhos de salvar e sair."
+              },
+              "installer": {
+                "title": "Instalador do sistema",
+                "body": "Um instalador gráfico e de linha de comando que implanta o sistema em um disco AHCI ou USB particionado com GPT."
+              },
+              "ui-toolkit": {
+                "title": "Toolkit de UI em modo imediato",
+                "body": "A <code>libcoeleoui</code> dá aos apps em Ring&nbsp;3 a mesma linguagem de widgets do desktop; o binário <code>widgets</code> é uma demonstração ao vivo dela."
+              }
+            }
+          }
+        }
+      },
+
+      "screenshots": {
+        "title": "Capturas de tela",
+        "lead": "Capturadas do Coeleo OS rodando no QEMU. Selecione uma imagem para ampliar.",
+        "enlarge": "Ampliar captura",
+        "shots": {
+          "desktop": "O desktop do Coeleo OS rodando no QEMU: o tema escuro Slate, o chrome de janela desenhado pelo compositor em software e o painel.",
+          "terminal": "Uma janela do Coeleo OS no terminal virtual, com o shell rodando sobre o kernel x86_64 bare-metal no QEMU.",
+          "file-manager": "Uma janela no desktop do Coeleo OS no QEMU, pintada com o chrome do tema Slate feito pelo compositor.",
+          "shell": "Uma sessão de shell do Coeleo OS dentro de sua janela no terminal virtual, rodando no QEMU.",
+          "launcher": "Um estado do desktop do Coeleo OS no QEMU, com uma janela em overlay sobre o fundo do tema Slate.",
+          "widgets": "Uma janela de aplicativo Ring 3 no desktop do Coeleo OS, pintada com os design tokens compartilhados do coeleo-theme.",
+          "windows": "Janelas flutuantes no desktop do Coeleo OS, cada uma repintada pelo compositor em software conforme o dano é reportado."
+        }
+      },
+
+      "architecture": {
+        "title": "Arquitetura",
+        "lead": "Um único crate de kernel, pastas por domínio. Os programas são ELFs estáticos em Ring&nbsp;3 por cima, e uma ABI de syscalls é a única coisa que cruza a linha.",
+        "caption": "Mapa de domínios do kernel",
+        "headers": { "domain": "Domínio", "folder": "Pasta", "responsibility": "Responsabilidade" },
+        "domains": {
+          "boot": { "name": "Boot / CPU", "role": "GDT, IDT, LAPIC, console, ACPI, RTC" },
+          "mem": { "name": "Memória", "role": "PMM, VMM, heap do kernel" },
+          "bus": { "name": "PCI / host USB", "role": "Espaço de configuração PCI, xHCI" },
+          "fs": { "name": "Disco / FAT", "role": "FAT32, camada de bloco, GPT, AHCI, USB MSC, instalador" },
+          "net": { "name": "Rede", "role": "smoltcp, HTTP, TLS, DHCP, DNS A, virtio-net ou e1000e" },
+          "input": { "name": "Entrada", "role": "Teclado e mouse PS/2, UHCI, xHCI HID" },
+          "ui": { "name": "Desktop", "role": "Compositor, painel, KRunner, gerenciador de arquivos, VT, janelas" },
+          "task": { "name": "Processos", "role": "Escalonador preemptivo, syscalls, FDs, pipes, carregador ELF" }
+        },
+        "diagram": {
+          "ringLeft": "Ring 3 - userspace",
+          "ringRight": "Ring 0 - kernel",
+          "leftLines": ["ELFs estáticos no_std", "entrada em _start", "sem libc, sem linking dinâmico"],
+          "rightLines": ["um único crate", "pastas por domínio, não crates", "nenhum código de userspace linkado"],
+          "middle": "syscalls (27)",
+          "bottomLines": ["wrappers da libcoeleo", "a única travessia entre os rings"]
+        }
+      },
+
+      "apps": {
+        "title": "Userspace e bibliotecas",
+        "lead": "Os programas são ELFs estáticos <code>no_std</code> (<code>x86_64-unknown-none</code>) que entram em <code>_start</code> e conversam com o kernel pela <code>libcoeleo</code>.",
+        "appsCaption": "Aplicativos incluídos",
+        "appsHeaders": { "name": "Aplicativo", "role": "Função" },
+        "roles": {
+          "sh": "Shell interativo: edição de linha, completação, prompt dinâmico, aliases, builtins",
+          "edit": "Editor de texto TUI sobre o terminal virtual",
+          "widgets": "Demonstração gráfica do toolkit em modo imediato <code>libcoeleoui</code>",
+          "install": "Instalador gráfico e de linha de comando para discos GPT / AHCI",
+          "winprobe": "Benchmark de criação de superfícies e animação em Ring&nbsp;3",
+          "clock": "Processo gráfico de relógio em segundo plano",
+          "file-utils": "Utilitários de linha de comando autônomos para arquivos",
+          "verify": "Binários de verificação de spawn, tratamento de falhas e loop de CPU"
+        },
+        "libsCaption": "Bibliotecas no_std compartilhadas",
+        "libsHeaders": { "crate": "Crate", "role": "Função" },
+        "libRoles": {
+          "libcoeleo": "Wrappers de syscalls com uma API segura e livre de alocação",
+          "libcoeleoui": "Toolkit de widgets de UI em modo imediato",
+          "coeleo-theme": "Design tokens: paleta e métricas de layout",
+          "coeleo-draw": "Primitivas 2D: traços arredondados via SDF, texto e ícones",
+          "coeleo-image": "Decodificação de JPEG e PNG para papéis de parede",
+          "pkg": "Verificação Ed25519 e manipulação de pacotes <code>.coe</code>"
+        }
+      },
+
+      "build": {
+        "title": "Compilar e executar",
+        "lead": "Requer um host Linux com QEMU. O Rust nightly é fixado pelo arquivo de toolchain.",
+        "prereqTitle": "Pré-requisitos (Ubuntu / Debian)",
+        "buildTitle": "Compilar e depois dar boot",
+        "blockComments": {
+          "all": "ISO do kernel, ELFs do userspace e pacotes de teste",
+          "run": "Boot UEFI: virtio-blk, virtio-net, mouse USB"
+        },
+        "otherTargetsSummary": "Outros alvos de execução",
+        "otherTargetComments": {
+          "run-ahci": "disco de boot SATA/AHCI com uma partição GPT",
+          "run-e1000e": "NIC Intel e1000e em vez de virtio-net",
+          "run-usb": "xHCI com USB Mass Storage",
+          "run-bios": "dar boot na ISO pelo BIOS legado em vez de UEFI",
+          "run-hdd": "dar boot a partir de uma imagem de disco GPT (UEFI)"
+        },
+        "testsSummary": "Testes automatizados",
+        "testsLead": "As suítes de integração rodam o QEMU sem interface e verificam o log serial — incluindo TLS e verificação de assinatura de pacotes."
+      },
+
+      "roadmap": {
+        "title": "Roadmap",
+        "lead": "O trabalho aqui é dividido por fases: uma especificação escrita, depois o código, depois o gate daquela fase. A ordem abaixo é o que desbloqueia uma pessoa em uma máquina real, não o que é mais fácil de demonstrar.",
+        "today": "<strong>Já disponível</strong> — do boot a um desktop: memória física e virtual próprias, escalonador preemptivo, ABI de syscalls, compositor, shell, editor, instalador, gerenciador de pacotes e TLS. Em um núcleo, com no máximo oito processos ao mesmo tempo, sobre FAT32.",
+        "pills": {
+          "now": "A seguir",
+          "soon": "Depois",
+          "later": "Mais tarde",
+          "far": "Longo prazo",
+          "vision": "Visão"
+        },
+        "bands": {
+          "next": {
+            "title": "Deixar a mesa PS/2",
+            "desc": "Drivers que acabam com a dependência de uma porta dos anos 1990 e de um controlador de disco legado.",
+            "phases": {
+              "27": { "title": "NVMe", "body": "O SSD interno típico não é AHCI. Isto traz a mesma árvore FAT para um drive moderno." },
+              "28": { "title": "USB-Ethernet", "body": "Rede cabeada sem NIC PCI, para que uma máquina com dongle não fique offline." }
+            }
+          },
+          "soon": {
+            "title": "Profundidade da sessão",
+            "desc": "O que transforma um prompt funcional em uma sessão confiável.",
+            "phases": {
+              "29": { "title": "<code>mmap</code> anônimo e IPC de cópia", "body": "Hoje a memória é acessada pela API de alocação da biblioteca. Uma interface geral de mapeamento é o que destrava o resto desta faixa." },
+              "30": { "title": "Sockets no userspace", "body": "A pilha TCP/IP vive no kernel hoje. Sockets expõem TCP ao Ring&nbsp;3 sem mudar onde a pilha roda." },
+              "31": { "title": "Visualizador de subconjunto de HTML", "body": "Renderizar documentos reais no próprio sistema, começando por um subconjunto definido de HTML e CSS." },
+              "32": { "title": "Modelo de usuários", "body": "Sessões multiusuário e níveis de privilégio, como um recurso nativo do Coeleo. Hoje não há usuários nem privilégios a elevar." },
+              "33": { "title": "NTP", "body": "Acertar o relógio pela rede em vez de confiar apenas no RTC." }
+            }
+          },
+          "later": {
+            "title": "CPU, medindo primeiro",
+            "desc": "Um núcleo e um tick de 100&nbsp;Hz já cobrem o envelope alvo, então isto espera por uma medição que peça por eles.",
+            "phases": {
+              "34": { "title": "LAPIC tickless", "body": "Parar de pagar por uma interrupção periódica quando nada está executável." },
+              "35": { "title": "Multiprocessamento simétrico", "body": "Colocar todos os núcleos para trabalhar, o que significa reescrever o travamento de memória e heap de ponta a ponta." },
+              "36": { "title": "Threads dentro de um processo", "body": "Hoje há uma thread por processo. Threads exigem antes uma nova história de PCB, pilha e espaço de endereçamento." }
+            }
+          },
+          "far": {
+            "title": "Rádio, mídia, laptop",
+            "desc": "Cada um destes é um projeto em si, e cada um espera pela faixa acima.",
+            "phases": {
+              "37": { "title": "Wi-Fi", "body": "Blobs de firmware e 802.11 são onde sistemas pequenos travam, então isto entra depois que a rede cabeada estiver sólida." },
+              "38": { "title": "Áudio", "body": "Nenhum dispositivo de som é controlado hoje." },
+              "39": { "title": "Suspender", "body": "Estados de sono S3, construídos sobre o trabalho de ACPI já feito." },
+              "40": { "title": "Bateria e tampa", "body": "Relato de energia e eventos de tampa para uso em laptop." }
+            }
+          },
+          "vision": {
+            "title": "Além da máquina de referência",
+            "desc": "O horizonte distante: os subsistemas que transformam um desktop funcional em uma plataforma de propósito geral.",
+            "phases": {
+              "41": { "title": "Compositor e rede em Ring&nbsp;3", "body": "Mover ambos para fora do kernel, atrás de comunicação entre processos." },
+              "42": { "title": "Toolkit de UI declarativo", "body": "Um toolkit de nível mais alto para construir aplicações, ao lado do de modo imediato." },
+              "43": { "title": "Gerenciamento de janelas em mosaico", "body": "Um layout em mosaico controlado por teclado, oferecido ao lado do desktop flutuante." },
+              "44": { "title": "Leitura e escrita em EXT4", "body": "Um segundo sistema de arquivos, elevando o teto por arquivo do FAT32 e adicionando segurança contra travamentos." },
+              "45": { "title": "ABI POSIX, relibc e objetos compartilhados", "body": "Linking dinâmico e uma ABI familiar para que software portado de outros lugares possa carregar." },
+              "46": { "title": "IPv6", "body": "Endereçamento de nova geração ao lado da pilha IPv4." },
+              "47": { "title": "Aceleração 3D por GPU", "body": "Renderização e computação aceleradas por hardware, além do framebuffer em software." },
+              "48": { "title": "Paginação de 5 níveis e IOMMU", "body": "Um espaço de endereçamento maior, mais isolamento de DMA para drivers de dispositivo." },
+              "49": { "title": "Motor de HTML e CSS", "body": "Estender o mesmo motor rumo ao layout completo de documentos e conteúdo web mais rico." }
+            }
+          }
+        }
+      },
+
+      "docs": {
+        "title": "Documentação",
+        "items": {
+          "contribIndex": { "label": "Índice para contribuidores", "note": "Comece por aqui" },
+          "agents": { "label": "Como escrever código aqui", "note": "Padrões e contratos de contribuição" },
+          "architecture": { "label": "Arquitetura", "note": "Mapa técnico do código" },
+          "develop": { "label": "Desenvolvimento", "note": "Fluxos de build, teste e depuração" },
+          "troubleshooting": { "label": "Solução de problemas", "note": "Falhas no host e como recuperar" }
+        }
+      },
+
+      "faq": {
+        "title": "Perguntas frequentes",
+        "lead": "Respostas curtas e factuais sobre o que é o Coeleo OS, onde ele roda e o que ele deliberadamente não é.",
+        "items": [
+          {
+            "id": "what-is",
+            "q": "O que é o Coeleo OS?",
+            "a": "Coeleo OS é um sistema operacional x86_64 escrito do zero em Rust. Ele tem kernel, ABI de syscalls, compositor em software, shell e userspace próprios, todos construídos em um único repositório. Não é uma distribuição Linux e não usa o kernel Linux."
+          },
+          {
+            "id": "linux",
+            "q": "O Coeleo OS é uma distribuição Linux?",
+            "a": "Não. O Coeleo OS não usa o kernel Linux e não traz userspace Linux. Ele reutiliza alguns componentes focados de terceiros — Limine para boot, Flanterm para emulação de terminal, smoltcp para TCP/IP, fatfs para FAT32 e rustls para TLS — e implementa o resto por conta própria."
+          },
+          {
+            "id": "hardware",
+            "q": "O Coeleo OS roda em hardware real?",
+            "a": "Ele dá boot em máquinas UEFI e BIOS legado, e o caminho de desenvolvimento documentado é o QEMU com virtio-blk, virtio-net e entrada USB. O alvo é um único núcleo, cerca de 512 MiB de RAM e um framebuffer linear em software, sem GPU 3D."
+          },
+          {
+            "id": "build",
+            "q": "Como eu compilo e executo o Coeleo OS?",
+            "a": "Em um host Linux com QEMU instalado, execute \"make all\" para compilar a ISO do kernel e os ELFs do userspace, e depois \"make run\" para dar boot em UEFI com virtio-blk, virtio-net e mouse USB. Alvos como make run-ahci, make run-e1000e, make run-usb e make run-bios cobrem outras configurações de disco, rede e firmware."
+          },
+          {
+            "id": "redox",
+            "q": "Qual a diferença entre o Coeleo OS e o Redox OS?",
+            "a": "O Redox OS é um sistema tipo Unix com microkernel, compatibilidade de código-fonte com Linux e BSD, suporte a POSIX e uma toolchain de compilador portada. O Coeleo OS tem escopo menor e é deliberadamente não compatível com Unix: o kernel é um único crate, não há libc, não há linking dinâmico nem ABI POSIX, e os programas são ELFs estáticos no_std que entram em _start e conversam com o kernel por 27 syscalls. Uma ABI POSIX, a relibc e objetos compartilhados estão no roadmap de longo prazo, não implementados hoje."
+          },
+          {
+            "id": "license",
+            "q": "Qual é a licença do Coeleo OS?",
+            "a": "O Coeleo OS é distribuído sob os termos da Licença MIT ou da Licença Apache 2.0, à sua escolha (MIT OR Apache-2.0). Componentes de terceiros como Limine, Flanterm, smoltcp, fatfs e rustls mantêm suas próprias licenças."
+          },
+          {
+            "id": "cores",
+            "q": "O Coeleo OS suporta múltiplos núcleos de CPU?",
+            "a": "Ainda não. O escalonador roda em um núcleo, com tick LAPIC de 100 Hz e uma tabela de processos limitada a oito processos simultâneos. Multiprocessamento simétrico e threads dentro de um processo estão no roadmap, mas não estão implementados."
+          }
+        ]
+      },
+
+      "footer": {
+        "licenseHtml": "Distribuído sob os termos da <a href=\"https://github.com/coeleo-dev/coeleo-os/blob/main/LICENSE-MIT\" target=\"_blank\" rel=\"noopener\">Licença MIT</a> ou da <a href=\"https://github.com/coeleo-dev/coeleo-os/blob/main/LICENSE-APACHE\" target=\"_blank\" rel=\"noopener\">Licença Apache 2.0</a>, à sua escolha.",
+        "note": "Componentes de terceiros (Limine, Flanterm, <code>smoltcp</code>, <code>fatfs</code>, <code>rustls</code> e o firmware de boot linkado pelo build) mantêm suas próprias licenças.",
+        "repository": "Repositório",
+        "issues": "Issues"
+      }
+    }
+  }
+}
