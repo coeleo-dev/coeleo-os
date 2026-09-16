@@ -308,8 +308,8 @@ fn cmd_source(
 ) {
     let path_arg = args.split_whitespace().next().unwrap_or("");
     if path_arg.is_empty() {
-        err::err("source", "caminho de arquivo ausente");
-        err::usage("source", "<arquivo.sh>");
+        err::err("source", "missing file path");
+        err::usage("source", "<file.sh>");
         *last_status = 1;
         return;
     }
@@ -317,7 +317,7 @@ fn cmd_source(
     let path = cwd::resolve(cwd.as_str(), path_arg, &mut abs);
     let fd = libcoeleo::open(path, libcoeleo::OPEN_READ);
     if fd == ERR {
-        err::err_target("source", path_arg, "arquivo não encontrado");
+        err::err_target("source", path_arg, "file not found");
         *last_status = 1;
         return;
     }

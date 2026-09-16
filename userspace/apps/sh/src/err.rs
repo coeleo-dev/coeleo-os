@@ -1,17 +1,17 @@
 use libcoeleo::write;
 
-/// Formatted error: `erro: [cmd]: [msg]`
+/// Formatted error: `error: [cmd]: [msg]`
 pub fn err(cmd: &str, msg: &str) {
-    let _ = write(1, b"\x1b[1;31merro:\x1b[0m ");
+    let _ = write(1, b"\x1b[1;31merror:\x1b[0m ");
     let _ = write(1, cmd.as_bytes());
     let _ = write(1, b": ");
     let _ = write(1, msg.as_bytes());
     let _ = write(1, b"\n");
 }
 
-/// Contextual error: `erro: [cmd]: '[target]': [msg]`
+/// Contextual error: `error: [cmd]: '[target]': [msg]`
 pub fn err_target(cmd: &str, target: &str, msg: &str) {
-    let _ = write(1, b"\x1b[1;31merro:\x1b[0m ");
+    let _ = write(1, b"\x1b[1;31merror:\x1b[0m ");
     let _ = write(1, cmd.as_bytes());
     let _ = write(1, b": '");
     let _ = write(1, target.as_bytes());
@@ -20,25 +20,25 @@ pub fn err_target(cmd: &str, target: &str, msg: &str) {
     let _ = write(1, b"\n");
 }
 
-/// Usage hint: `uso: [cmd] [syntax]`
+/// Usage hint: `usage: [cmd] [syntax]`
 pub fn usage(cmd: &str, syntax: &str) {
-    let _ = write(1, b"\x1b[90muso: ");
+    let _ = write(1, b"\x1b[90musage: ");
     let _ = write(1, cmd.as_bytes());
     let _ = write(1, b" ");
     let _ = write(1, syntax.as_bytes());
     let _ = write(1, b"\x1b[0m\n");
 }
 
-/// Warning: `aviso: [msg]`
+/// Warning: `warning: [msg]`
 pub fn warn(msg: &str) {
-    let _ = write(1, b"\x1b[1;33maviso:\x1b[0m ");
+    let _ = write(1, b"\x1b[1;33mwarning:\x1b[0m ");
     let _ = write(1, msg.as_bytes());
     let _ = write(1, b"\n");
 }
 
-/// Hint: `dica: [msg]`
+/// Hint: `tip: [msg]`
 pub fn hint(msg: &str) {
-    let _ = write(1, b"\x1b[1;36mdica:\x1b[0m ");
+    let _ = write(1, b"\x1b[1;36mtip:\x1b[0m ");
     let _ = write(1, msg.as_bytes());
     let _ = write(1, b"\n");
 }

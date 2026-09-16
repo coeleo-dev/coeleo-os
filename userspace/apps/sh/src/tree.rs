@@ -20,7 +20,7 @@ pub fn cmd_tree(cwd: &Cwd, args: &str) {
     let fd = open(path, OPEN_READ);
     if fd == ERR {
         let _ = write(1, b"tree: not found\n");
-        err::err_target("tree", path, "diretório não encontrado");
+        err::err_target("tree", path, "directory not found");
         return;
     }
     let _ = close(fd);
@@ -43,9 +43,9 @@ pub fn cmd_tree(cwd: &Cwd, args: &str) {
 
     let _ = write(1, b"\n");
     print_num(dir_count);
-    let _ = write(1, b" diret\xc3\xb3rio(s), ");
+    let _ = write(1, b" dir(s), ");
     print_num(file_count);
-    let _ = write(1, b" arquivo(s)\n");
+    let _ = write(1, b" file(s)\n");
 }
 
 fn walk_dir(
